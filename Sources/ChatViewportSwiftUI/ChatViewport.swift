@@ -20,6 +20,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     @State private var scrollProxy: ScrollViewProxy?
     @State private var previousCount: Int = 0
     @State private var previousContentHeight: CGFloat = 0
+    @State private var viewportWidth: CGFloat = 0
 
     public init(
         _ data: Data,
@@ -62,6 +63,9 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                                 .background(
                                     GeometryReader { rowProxy in
                                         let frame = rowProxy.frame(in: .named(viewportCoordinateSpace))
+                                        // Record height in index — reuses existing GeometryReader (design rule 6).
+                                        // Simple dictionary write, no @Published, no view invalidation.
+                                        let _ = controller.heightIndex.record(id: itemID, height: frame.height)
                                         Color.clear.preference(
                                             key: RowFramesPreference<ID>.self,
                                             value: [RowFrame(
@@ -109,6 +113,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                 .onAppear {
                     scrollProxy = proxy
                     viewportHeight = outerProxy.size.height
+                    viewportWidth = outerProxy.size.width
                     previousCount = data.count
                 }
                 .onChange(of: outerProxy.size.height) { newHeight in
@@ -120,6 +125,14 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             controller.scrollToBottom(animated: false)
                         }
+                    }
+                }
+                .onChange(of: outerProxy.size.width) { newWidth in
+                    if newWidth != viewportWidth {
+                        viewportWidth = newWidth
+                        // Width change invalidates all cached heights — row content
+                        // will re-layout at new width with different heights.
+                        controller.heightIndex.invalidateAll()
                     }
                 }
                 .onChange(of: data.count) { newCount in

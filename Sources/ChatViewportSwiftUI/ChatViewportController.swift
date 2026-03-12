@@ -53,6 +53,10 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
     /// Set by ScrollViewBridge; used for pixel-precise prepend offset correction.
     internal weak var scrollViewRef: UIScrollView?
 
+    /// Height index for probe-align scrollTo(id:) engine.
+    /// Plain property, NOT @Published — avoids unnecessary view invalidation (design rule 3).
+    internal let heightIndex = HeightIndex<ID>()
+
     /// Whether the UIScrollView bridge has been established (for debugging).
     public var hasScrollViewRef: Bool { scrollViewRef != nil }
 

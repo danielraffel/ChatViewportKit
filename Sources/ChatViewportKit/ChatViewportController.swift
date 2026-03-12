@@ -1,20 +1,31 @@
 import SwiftUI
 
-/// Controller for imperative scroll commands on a `ChatViewport`.
+/// Controller for imperative scroll commands and viewport state on a `ChatViewport`.
 public final class ChatViewportController<ID: Hashable>: ObservableObject {
 
-    // MARK: - Published command (consumed by ChatViewport's body)
+    // MARK: - Published state
+
+    /// The current scroll command to execute (consumed by ChatViewport).
     @Published internal var pendingCommand: ScrollCommand<ID>?
 
+    /// The current viewport mode — drives behavior on data changes and scroll events.
+    @Published public private(set) var mode: ViewportMode<ID> = .initialBottomAnchored
+
+    /// Whether the viewport is currently pinned to the bottom.
+    @Published public private(set) var isPinnedToBottom: Bool = true
+
     // MARK: - Internal state (set by ChatViewport)
+
     internal var firstItemID: ID?
     internal var lastItemID: ID?
 
-    /// Whether the controller has been connected (debug use).
-    public var isConnected: Bool { true }
+    /// Generation counter to prevent stale commands from executing.
+    /// Incremented each time a new command is issued; the view checks
+    /// this before executing to skip superseded commands.
+    internal var commandGeneration: UInt64 = 0
 
-    /// The last item ID tracked by the controller (debug use).
-    public var debugLastItemID: ID? { lastItemID }
+    /// Callback when pinned-to-bottom state changes (for host "jump to latest" UI).
+    public var onBottomPinnedChanged: ((Bool) -> Void)?
 
     public init() {}
 
@@ -22,16 +33,42 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
 
     public func scrollToBottom(animated: Bool = true) {
         guard let id = lastItemID else { return }
-        pendingCommand = .scrollTo(id: id, anchor: .bottom, animated: animated)
+        issueCommand(.scrollTo(id: id, anchor: .bottom, animated: animated))
+        transitionMode(.pinnedToBottom)
     }
 
     public func scrollToTop(animated: Bool = true) {
         guard let id = firstItemID else { return }
-        pendingCommand = .scrollTo(id: id, anchor: .top, animated: animated)
+        issueCommand(.scrollTo(id: id, anchor: .top, animated: animated))
+        transitionMode(.freeBrowsing(anchor: nil))
     }
 
     public func scrollTo(id: ID, anchor: UnitPoint = .center, animated: Bool = true) {
-        pendingCommand = .scrollTo(id: id, anchor: anchor, animated: animated)
+        issueCommand(.scrollTo(id: id, anchor: anchor, animated: animated))
+        transitionMode(.freeBrowsing(anchor: nil))
+    }
+
+    private func issueCommand(_ command: ScrollCommand<ID>) {
+        commandGeneration &+= 1
+        pendingCommand = command
+    }
+
+    // MARK: - Mode transitions (called by ChatViewport internals)
+
+    internal func transitionMode(_ newMode: ViewportMode<ID>) {
+        let wasPinned = isPinnedToBottom
+        mode = newMode
+        let nowPinned: Bool
+        switch newMode {
+        case .initialBottomAnchored, .pinnedToBottom:
+            nowPinned = true
+        case .freeBrowsing, .programmaticScroll, .correctingAfterDataChange:
+            nowPinned = false
+        }
+        if nowPinned != wasPinned {
+            isPinnedToBottom = nowPinned
+            onBottomPinnedChanged?(nowPinned)
+        }
     }
 }
 

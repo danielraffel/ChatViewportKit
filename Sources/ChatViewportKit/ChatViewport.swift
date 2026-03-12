@@ -15,6 +15,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     private let configuration: ChatViewportConfiguration
 
     @State private var viewportHeight: CGFloat = 0
+    @State private var contentHeight: CGFloat = 0
     @State private var scrollProxy: ScrollViewProxy?
     @State private var previousCount: Int = 0
     @State private var previousLastID: ID?
@@ -39,12 +40,45 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                 ScrollView(showsIndicators: configuration.showsIndicators) {
                     LazyVStack(spacing: configuration.spacing) {
                         ForEach(Array(data), id: idKeyPath) { item in
+                            let itemID = item[keyPath: idKeyPath]
                             rowContent(item)
-                                .id(item[keyPath: idKeyPath])
+                                .id(itemID)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
+                                .background(
+                                    GeometryReader { rowProxy in
+                                        Color.clear.preference(
+                                            key: RowFramesPreference<ID>.self,
+                                            value: [RowFrame(
+                                                id: itemID,
+                                                minY: rowProxy.frame(in: .named(viewportCoordinateSpace)).minY,
+                                                maxY: rowProxy.frame(in: .named(viewportCoordinateSpace)).maxY
+                                            )]
+                                        )
+                                    }
+                                )
                         }
                     }
                     .frame(minHeight: outerProxy.size.height, alignment: .bottom)
+                    .background(
+                        GeometryReader { contentProxy in
+                            Color.clear
+                                .preference(
+                                    key: ContentHeightPreference.self,
+                                    value: contentProxy.size.height
+                                )
+                                .preference(
+                                    key: ScrollOffsetPreference.self,
+                                    value: contentProxy.frame(in: .named(viewportCoordinateSpace)).minY
+                                )
+                        }
+                    )
+                }
+                .coordinateSpace(name: viewportCoordinateSpace)
+                .onPreferenceChange(ContentHeightPreference.self) { height in
+                    contentHeight = height
+                }
+                .onPreferenceChange(ScrollOffsetPreference.self) { offset in
+                    updateBottomPinState(scrollOffset: offset)
                 }
                 .onAppear {
                     scrollProxy = proxy
@@ -60,9 +94,9 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                     let currentLastID = data.last?[keyPath: idKeyPath]
                     updateControllerIDs()
                     // Auto-scroll to bottom only when items are appended (last ID changed)
-                    // Prepend (first ID changed, last ID same) should not disturb scroll position
+                    // and we are currently pinned to bottom
                     let isAppend = newCount > previousCount && currentLastID != previousLastID
-                    if isAppend, let lastID = currentLastID {
+                    if isAppend && controller.isPinnedToBottom, let lastID = currentLastID {
                         withAnimation {
                             proxy.scrollTo(lastID, anchor: .bottom)
                         }
@@ -99,6 +133,25 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     private func updateControllerIDs() {
         controller.firstItemID = data.first?[keyPath: idKeyPath]
         controller.lastItemID = data.last?[keyPath: idKeyPath]
+    }
+
+    /// Determine if we're pinned to bottom based on scroll offset.
+    /// scrollOffset is the content's minY in the viewport coordinate space.
+    /// When scrolled to bottom: contentHeight + scrollOffset ≈ viewportHeight
+    private func updateBottomPinState(scrollOffset: CGFloat) {
+        let distanceFromBottom = contentHeight + scrollOffset - viewportHeight
+        let isAtBottom = distanceFromBottom <= configuration.bottomPinThreshold
+        let isUnderfilled = contentHeight <= viewportHeight
+
+        if isUnderfilled || isAtBottom {
+            if !controller.isPinnedToBottom {
+                controller.transitionMode(.pinnedToBottom)
+            }
+        } else {
+            if controller.isPinnedToBottom {
+                controller.transitionMode(.freeBrowsing(anchor: nil))
+            }
+        }
     }
 }
 

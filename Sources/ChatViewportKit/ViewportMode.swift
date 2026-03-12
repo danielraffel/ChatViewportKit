@@ -2,10 +2,15 @@ import SwiftUI
 
 /// The current scroll mode of the viewport, used to make update behavior deterministic.
 public enum ViewportMode<ID: Hashable>: Equatable {
+    /// Initial state: content is bottom-anchored via layout, no scrolling has occurred.
     case initialBottomAnchored
+    /// User is at the bottom — new appends should auto-scroll to follow.
     case pinnedToBottom
-    case freeBrowsing(anchor: AnchorSnapshot<ID>)
+    /// User has scrolled away from the bottom — appends should NOT move the viewport.
+    case freeBrowsing(anchor: AnchorSnapshot<ID>?)
+    /// A programmatic scroll is in progress.
     case programmaticScroll(target: ScrollTarget<ID>)
+    /// Data changed and we're restoring the anchor position.
     case correctingAfterDataChange(anchor: AnchorSnapshot<ID>)
 }
 

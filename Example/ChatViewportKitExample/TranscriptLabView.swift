@@ -41,37 +41,10 @@ struct TranscriptLabView: View {
             .navigationTitle("Transcript Lab")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
-                // Phase 0 test: async height change
-                // Step 1: Fill 30 messages
-                for i in 0..<30 {
+                // Start with a few messages to demonstrate bottom anchoring
+                for _ in 0..<3 {
                     messages.append(LabMessage(text: "Message \(nextIndex)"))
                     nextIndex += 1
-                }
-                testLog = "Filled 31 msgs"
-
-                // Step 2: Scroll to message 10 after layout
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    let targetID = messages[10].id
-                    controller.scrollTo(id: targetID, anchor: .top, animated: false)
-                    testLog = "Scrolled to msg 10"
-                }
-
-                // Step 3: Async expand message 5 (ABOVE viewport) — should not disturb
-                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                    withAnimation {
-                        messages[5].extraHeight = 200
-                        messages[5].text += "\n[Expanded to 200pt]"
-                    }
-                    testLog = "Expanded msg 5 (above viewport)"
-                }
-
-                // Step 4: Async expand message 12 (IN viewport) — test stability
-                DispatchQueue.main.asyncAfter(deadline: .now() + 7.0) {
-                    withAnimation {
-                        messages[12].extraHeight = 200
-                        messages[12].text += "\n[Expanded to 200pt]"
-                    }
-                    testLog = "Expanded msg 12 (in viewport)"
                 }
             }
             .toolbar {
@@ -104,6 +77,8 @@ struct TranscriptLabView: View {
     private var debugHUD: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Messages: \(messages.count)")
+            Text("Mode: \(modeDescription)")
+            Text("Pinned: \(controller.isPinnedToBottom ? "YES" : "NO")")
             Text("First ID: \(messages.first?.id.uuidString.prefix(8) ?? "—")")
             Text("Last ID: \(messages.last?.id.uuidString.prefix(8) ?? "—")")
             if !testLog.isEmpty {
@@ -114,6 +89,16 @@ struct TranscriptLabView: View {
         .padding(8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.systemGray5).opacity(0.8))
+    }
+
+    private var modeDescription: String {
+        switch controller.mode {
+        case .initialBottomAnchored: return "initialBottomAnchored"
+        case .pinnedToBottom: return "pinnedToBottom"
+        case .freeBrowsing: return "freeBrowsing"
+        case .programmaticScroll: return "programmaticScroll"
+        case .correctingAfterDataChange: return "correcting"
+        }
     }
 
     // MARK: - Controls
@@ -127,6 +112,7 @@ struct TranscriptLabView: View {
                         Button("+3") { appendMessages(3) }
                         Button("+10") { appendMessages(10) }
                         Button("+50") { appendMessages(50) }
+                        Button("+5K") { appendMessages(5000) }
                         Button("Burst 20") { burstAppend(20) }
                     }
                     .buttonStyle(.borderedProminent)

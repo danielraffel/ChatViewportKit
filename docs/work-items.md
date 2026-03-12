@@ -41,16 +41,16 @@ Goal: Prove hard requirements are achievable with ScrollView + LazyVStack before
 
 Goal: Ship the generic API and core bottom-aware layout behavior.
 
-- [ ] **1.1** Implement `ChatViewport<Data, ID, RowContent>: View` with full generic signature
-- [ ] **1.2** Implement `ChatViewportController<ID: Hashable>: ObservableObject`
-- [ ] **1.3** Implement `ChatViewportConfiguration` with all config knobs
-- [ ] **1.4** Implement `ViewportMode` state machine with all defined transitions
-- [ ] **1.5** Add geometry capture: viewport height, underfilled content height, visible row frames via preference keys
-- [ ] **1.6** Implement underflow bottom anchoring as layout (topFill spacer), not scroll-on-appear
-- [ ] **1.7** Wire `scrollToBottom`, `scrollToTop`, `scrollTo(id:)` through ScrollViewReader
-- [ ] **1.8** Implement scroll command coordinator with sequencing (prevent competing commands in one run loop)
-- [ ] **1.9** Build demo with generic rows (not message-specific) proving the component is reusable
-- [ ] **1.10** Performance baseline: measure frame times for 50, 500, 5000 rows — must maintain 60fps scroll
+- [x] **1.1** Implement `ChatViewport<Data, ID, RowContent>: View` with full generic signature
+- [x] **1.2** Implement `ChatViewportController<ID: Hashable>: ObservableObject`
+- [x] **1.3** Implement `ChatViewportConfiguration` with all config knobs
+- [x] **1.4** Implement `ViewportMode` state machine with all defined transitions
+- [x] **1.5** Add geometry capture: viewport height, underfilled content height, visible row frames via preference keys
+- [x] **1.6** Implement underflow bottom anchoring as layout (topFill spacer), not scroll-on-appear
+- [x] **1.7** Wire `scrollToBottom`, `scrollToTop`, `scrollTo(id:)` through ScrollViewReader
+- [x] **1.8** Implement scroll command coordinator with sequencing (prevent competing commands in one run loop)
+- [x] **1.9** Build demo with generic rows (not message-specific) proving the component is reusable
+- [x] **1.10** Performance baseline: measure frame times for 50, 500, 5000 rows — must maintain 60fps scroll
 
 ### Phase 1 Exit Gate:
 - Reusable component exists with public API matching spec

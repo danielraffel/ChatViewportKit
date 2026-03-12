@@ -1,1 +1,10 @@
 .DS_Store
+.swiftpm/
+.claude/
+Example/build/
+xcuserdata/
+
+# AI process artifacts (kept locally, not committed)
+ai/
+docs/work-items.md
+docs/learnings.md

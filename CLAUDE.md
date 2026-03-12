@@ -8,13 +8,9 @@ ChatViewportKit is a reusable SwiftUI bottom-anchored chat viewport component. N
 
 The component should serve: AI streaming conversations, activity feeds, event timelines, log consoles, comments/threads, and any bottom-aware transcript UI.
 
-## Design Decision History
+## Architecture
 
-Two architectural approaches were reviewed:
-
-1. **v1 (ai/review.txt)**: UICollectionView-based engine. Rejected as primary plan — doesn't satisfy LazyVStack hard requirement. Kept as reference for invariant-driven thinking and state machine design.
-2. **v2 (ai/review-v2.txt)**: ScrollView + LazyVStack first. **This is the accepted plan.** Private UIScrollView bridge planned for Phase 3 pixel-precise anchor correction only.
-3. **Review (ai/review-v2-claude.txt)**: Design-level approved, implementation conditionally approved pending Phase 0 feasibility proof.
+ScrollView + LazyVStack is the render engine. A private UIScrollView bridge (Phase 3) provides pixel-precise anchor correction for prepend operations only — all other functionality uses pure SwiftUI APIs.
 
 ## Hard Requirements
 
@@ -51,17 +47,18 @@ struct AnchorSnapshot<ID: Hashable>
 - `ChatViewportKitExample` — Transcript Lab demo app (proves every capability)
 - Clean module boundary: no demo code in framework, no framework internals leaked
 
-## Tracking Docs
+## Build & Run
 
-- **docs/work-items.md** — source of truth for all implementation progress (Phases 0-5). Read at start of every iteration.
-- **docs/learnings.md** — development discoveries, gotchas, performance findings. Check before starting any work.
-- **ai/ralph-loop.md** — ralph-loop automation prompt for driving implementation.
+```bash
+# Build for simulator
+xcodebuildmcp simulator build-sim --scheme ChatViewportKitExample --project-path ./Example/ChatViewportKitExample.xcodeproj --simulator-name "iPhone 16 Pro"
 
-## Tooling
+# Build and run
+xcodebuildmcp simulator build-run-sim --scheme ChatViewportKitExample --project-path ./Example/ChatViewportKitExample.xcodeproj --simulator-name "iPhone 16 Pro"
 
-- **xcodebuildmcp** (XcodeBuildMCP CLI): Build, test, and run in iOS simulator. Primary verification method.
-- **sosumi MCP**: Apple documentation lookups — ScrollView, LazyVStack, ScrollViewReader, NavigationStack, preference keys, UIScrollView bridging.
-- **/codex**: Parallel research tasks. Do NOT delegate simulator testing to Codex.
+# Build framework only
+xcodebuildmcp swift-package build --package-path .
+```
 
 ## Key Technical Concepts
 
@@ -71,16 +68,6 @@ struct AnchorSnapshot<ID: Hashable>
 - **Update pipeline**: Classify update → capture anchor → apply data → let layout settle → restore anchor → animate → recompute mode (the architectural spine — every mutation flows through it)
 - **Measurement regime**: Total content height only while underfilled; after overflow, rely on visible-row frames and bottom distance
 
-## Phased Build Plan (sequential, no skipping)
-
-- **Phase 0**: Feasibility spike — prove hard requirements. THREE GATE TESTS must pass: (1) underfill→overflow transition smooth, (2) prepend no jump, (3) async height change no disturbance. If gates fail: increase UIKit assist, don't abandon SwiftUI component.
-- **Phase 1**: Reusable component skeleton with full generic API
-- **Phase 2**: Bottom pin detection and append animation
-- **Phase 3**: Position preservation with private UIScrollView offset bridge
-- **Phase 4**: NavigationStack, keyboard/composer, accessibility
-- **Phase 5**: Packaging, performance validation, Transcript Lab demo, documentation
-
 ## Target
 
-- iOS 16+ (UIHostingConfiguration compatibility for Phase 3 bridge)
-- Test on iOS 16, 17, 18 simulators when behavior differs across versions
+- iOS 16+

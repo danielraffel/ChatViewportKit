@@ -169,6 +169,26 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
         transitionMode(.freeBrowsing(anchor: nil))
     }
 
+    /// Scroll to top with a bounce that forces NavigationStack to re-render
+    /// the title bar. Use after changing `navigationBarTitleDisplayMode`
+    /// — SwiftUI doesn't always update the nav bar without a rubber-band trigger.
+    public func bounceToTop() {
+        guard let scrollView = scrollViewRef else {
+            scrollToAbsoluteTop()
+            return
+        }
+        // Step 1: overscroll past the top to trigger rubber-band
+        let topOffset = -scrollView.adjustedContentInset.top
+        scrollView.setContentOffset(CGPoint(x: 0, y: topOffset - 100), animated: false)
+        // Step 2: after a beat, let it snap back to the natural resting position
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak scrollView] in
+            guard let scrollView = scrollView else { return }
+            let newTop = -scrollView.adjustedContentInset.top
+            scrollView.setContentOffset(CGPoint(x: 0, y: newTop), animated: true)
+        }
+        transitionMode(.freeBrowsing(anchor: nil))
+    }
+
     public func scrollTo(id: ID, anchor: UnitPoint = .center, animated: Bool = true) {
         issueCommand(.scrollTo(id: id, anchor: anchor, animated: animated))
         transitionMode(.freeBrowsing(anchor: nil))

@@ -51,9 +51,10 @@ struct TranscriptLabView: View {
                     HStack(spacing: 8) {
                         Button(useLargeTitle ? "Inline" : "Title") {
                             useLargeTitle.toggle()
-                            // Force scroll to absolute top so large title can expand.
-                            // proxy.scrollTo leaves a small offset; need contentOffset = .zero.
-                            controller.scrollToAbsoluteTop()
+                            // Bounce forces nav bar to re-render after display mode change
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                controller.bounceToTop()
+                            }
                         }
                         .foregroundColor(.accentColor)
                         Button("HUD") {

@@ -64,16 +64,16 @@ Goal: Ship the generic API and core bottom-aware layout behavior.
 
 Goal: Make new tail content feel correct in both underfilled and overflowing states.
 
-- [ ] **2.1** Detect pinned-to-bottom state using `bottomPinThreshold` from configuration
-- [ ] **2.2** Implement ViewportMode transitions between `pinnedToBottom` and `freeBrowsing`
-- [ ] **2.3** Implement bottom-origin insertion animation when pinned: `.move(edge: .bottom).combined(with: .opacity)`
-- [ ] **2.4** Ensure appending while free-browsing does not move the viewport
-- [ ] **2.5** Expose `isPinnedToBottom` and `onBottomPinnedChanged` for host "jump to latest" UI
-- [ ] **2.6** Test underfill append animation (filler shrinks, row animates in from bottom)
-- [ ] **2.7** Test overflow append animation (scroll follows, row animates in from bottom)
-- [ ] **2.8** Test transition: underfilled transcript becomes overflowing during append burst
-- [ ] **2.9** Test: first message and 100th message both animate in from bottom when pinned
-- [ ] **2.10** Performance: append burst of 50 messages must not drop below 60fps
+- [x] **2.1** Detect pinned-to-bottom state using `bottomPinThreshold` from configuration
+- [x] **2.2** Implement ViewportMode transitions between `pinnedToBottom` and `freeBrowsing`
+- [x] **2.3** Implement bottom-origin insertion animation when pinned: `.move(edge: .bottom).combined(with: .opacity)`
+- [x] **2.4** Ensure appending while free-browsing does not move the viewport
+- [x] **2.5** Expose `isPinnedToBottom` and `onBottomPinnedChanged` for host "jump to latest" UI
+- [x] **2.6** Test underfill append animation (filler shrinks, row animates in from bottom)
+- [x] **2.7** Test overflow append animation (scroll follows, row animates in from bottom)
+- [x] **2.8** Test transition: underfilled transcript becomes overflowing during append burst
+- [x] **2.9** Test: first message and 100th message both animate in from bottom when pinned
+- [x] **2.10** Performance: append burst of 50 messages must not drop below 60fps
 
 ### Phase 2 Exit Gate:
 - First and 100th message both animate smoothly from bottom when pinned

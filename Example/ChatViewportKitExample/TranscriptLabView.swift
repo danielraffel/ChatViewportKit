@@ -45,13 +45,7 @@ struct TranscriptLabView: View {
             }
             .navigationTitle("Transcript Lab")
             .navigationBarTitleDisplayMode(useLargeTitle ? .large : .inline)
-            .onAppear {
-                // Load 30 messages to test scrolling with large title
-                for _ in 0..<29 {
-                    messages.append(LabMessage(text: "Message \(nextIndex)"))
-                    nextIndex += 1
-                }
-            }
+            // .onAppear { runStressTest() } // Uncomment for automated tests
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
@@ -86,19 +80,34 @@ struct TranscriptLabView: View {
 
     private var debugHUD: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Messages: \(messages.count)")
-            Text("Mode: \(modeDescription)")
-            Text("Pinned: \(controller.isPinnedToBottom ? "YES" : "NO")")
-            Text("First ID: \(messages.first?.id.uuidString.prefix(8) ?? "—")")
-            Text("Last ID: \(messages.last?.id.uuidString.prefix(8) ?? "—")")
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Msgs: \(messages.count)")
+                    Text("Mode: \(modeDescription)")
+                    Text("Pin: \(controller.isPinnedToBottom ? "Y" : "N")")
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Top: \(topVisibleText)")
+                    Text("SV: \(controller.hasScrollViewRef ? "Y" : "N")")
+                    Text("Freeze: \(controller.freezeAnchorState ? "Y" : "N")")
+                }
+            }
             if !testLog.isEmpty {
                 Text(testLog).foregroundColor(.green)
             }
         }
         .font(.system(.caption2, design: .monospaced))
-        .padding(8)
+        .padding(6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.systemGray5).opacity(0.8))
+    }
+
+    private var topVisibleText: String {
+        guard let topID = controller.topVisibleItemID,
+              let msg = messages.first(where: { $0.id == topID }) else {
+            return "—"
+        }
+        return msg.text
     }
 
     private var modeDescription: String {
@@ -146,6 +155,7 @@ struct TranscriptLabView: View {
                         Button("+10") { appendMessages(10) }
                         Button("+50") { appendMessages(50) }
                         Button("+5K") { appendMessages(5000) }
+                        Button("+10K") { appendMessages(10000) }
                         Button("Burst 20") { burstAppend(20) }
                     }
                     .buttonStyle(.borderedProminent)
@@ -237,6 +247,78 @@ struct TranscriptLabView: View {
         withAnimation {
             messages[messages.count - 1].extraHeight = 200
             messages[messages.count - 1].text += "\n[Expanded to 200pt]"
+        }
+    }
+
+    // MARK: - Stress Test
+
+    private func runStressTest() {
+        let start = CFAbsoluteTimeGetCurrent()
+        // Load 10K messages
+        var batch: [LabMessage] = []
+        for i in 1...10000 {
+            batch.append(LabMessage(text: "Msg \(i)", extraHeight: i % 3 == 0 ? CGFloat(60 + (i % 100)) : nil))
+        }
+        messages = batch
+        nextIndex = 10001
+        let loadTime = CFAbsoluteTimeGetCurrent() - start
+        testLog = "10K loaded: \(String(format: "%.0fms", loadTime * 1000))"
+        NSLog("[STRESS] 10K load: \(loadTime * 1000)ms")
+
+        // Scroll to middle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            controller.scrollTo(id: messages[5000].id, anchor: .center, animated: false)
+            testLog += " | scrolled to 5000"
+        }
+
+        // Append 50 while at middle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            let appendStart = CFAbsoluteTimeGetCurrent()
+            for _ in 0..<50 {
+                messages.append(LabMessage(text: "Appended \(nextIndex)"))
+                nextIndex += 1
+            }
+            let appendTime = CFAbsoluteTimeGetCurrent() - appendStart
+            NSLog("[STRESS] Append 50 at 10K: \(appendTime * 1000)ms")
+            testLog += " | +50: \(String(format: "%.0fms", appendTime * 1000))"
+        }
+
+        // Prepend 50
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            let prependStart = CFAbsoluteTimeGetCurrent()
+            controller.prepareToPrepend()
+            var newBatch: [LabMessage] = []
+            for _ in 0..<50 {
+                prependCounter += 1
+                newBatch.append(LabMessage(text: "History \(prependCounter)"))
+            }
+            messages.insert(contentsOf: newBatch, at: 0)
+            let prependTime = CFAbsoluteTimeGetCurrent() - prependStart
+            NSLog("[STRESS] Prepend 50 at 10K: \(prependTime * 1000)ms")
+            testLog = "Pre50: \(String(format: "%.0fms", prependTime * 1000))"
+        }
+
+        // Burst append while scrolling
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            controller.scrollToBottom(animated: false)
+            for i in 0..<20 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
+                    withAnimation {
+                        messages.append(LabMessage(text: "Burst \(nextIndex)"))
+                        nextIndex += 1
+                    }
+                }
+            }
+            testLog = "Burst 20 at 10K"
+        }
+
+        // Height mutation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
+            let idx = 5000
+            messages[idx].extraHeight = 200
+            messages[idx].text += "\n[Stress expanded]"
+            testLog = "Height mutated at 10K"
+            NSLog("[STRESS] All stress tests complete")
         }
     }
 

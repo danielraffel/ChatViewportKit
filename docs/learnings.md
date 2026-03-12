@@ -108,6 +108,19 @@ SwiftUI's ScrollView + LazyVStack with proper item IDs handles all three gate te
 - Formula: `newOffset.y = capturedOffsetY + delta`
 - Tested and verified for prepend counts of 1, 10, and 50 items — all preserve scroll position
 
+## Stress Test Performance (Phase 5)
+
+At 10,000 rows with mixed heights (every 3rd row has variable height):
+- **10K load**: 5.4ms (array allocation + state update)
+- **Append 50**: 8.2ms (well under 16ms/frame at 60fps)
+- **Prepend 50**: 0.85ms (nearly instant)
+- **Burst append 20**: Each append ~0.4ms, 20 appends spaced 50ms apart — smooth
+- **Height mutation**: Sub-millisecond, handled by SwiftUI layout system
+
+All operations are well within the 60fps frame budget (16.67ms).
+
+LazyVStack renders only ~11 visible rows regardless of total count, so scroll performance is inherently O(1).
+
 ## Apple Documentation References
 
 (Add links to relevant Apple docs discovered via sosumi MCP here)

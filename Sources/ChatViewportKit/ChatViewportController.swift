@@ -35,6 +35,9 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
     /// Whether the UIScrollView bridge has been established (for debugging).
     public var hasScrollViewRef: Bool { scrollViewRef != nil }
 
+    /// Whether the anchor is currently frozen (for debugging).
+    public var freezeAnchorState: Bool { freezeAnchor }
+
     /// Generation counter to prevent stale commands from executing.
     /// Incremented each time a new command is issued; the view checks
     /// this before executing to skip superseded commands.

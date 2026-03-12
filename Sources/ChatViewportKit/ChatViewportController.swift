@@ -80,33 +80,23 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
     // MARK: - Public API
 
     public func scrollToBottom(animated: Bool = true) {
-        // Prefer UIScrollView bridge for reliability — proxy.scrollTo can fail
-        // when the target is far from the current render window in LazyVStack.
-        if let scrollView = scrollViewRef {
-            DispatchQueue.main.async { [weak scrollView] in
-                guard let scrollView = scrollView else { return }
-                scrollView.layoutIfNeeded()
-                let bottomOffset = scrollView.contentSize.height - scrollView.bounds.height + scrollView.contentInset.bottom
-                if bottomOffset > 0 {
-                    scrollView.setContentOffset(
-                        CGPoint(x: 0, y: bottomOffset),
-                        animated: animated
-                    )
-                }
-            }
-        } else if let id = lastItemID {
-            issueCommand(.scrollTo(id: id, anchor: .bottom, animated: animated))
-        }
-        transitionMode(.pinnedToBottom)
+        // Use retry-based scroll so callers don't need to worry about timing
+        // relative to SwiftUI's layout pass. The retry handles cases where
+        // data was just appended and layout hasn't settled yet.
+        scrollToBottomWithRetry(
+            maxAttempts: 5,
+            attemptInterval: 0.15,
+            animated: animated
+        )
     }
 
     /// Scroll to bottom with retry — ensures we reach the true bottom even when
     /// SwiftUI's layout is still settling (large batch appends, animations).
-    internal func scrollToBottomWithRetry(maxAttempts: Int = 5, attemptInterval: TimeInterval = 0.15, completion: (() -> Void)? = nil) {
+    internal func scrollToBottomWithRetry(maxAttempts: Int = 5, attemptInterval: TimeInterval = 0.15, animated: Bool = true, completion: (() -> Void)? = nil) {
         guard let scrollView = scrollViewRef else {
             // No bridge — fall back to single-shot proxy scroll
             if let id = lastItemID {
-                issueCommand(.scrollTo(id: id, anchor: .bottom, animated: true))
+                issueCommand(.scrollTo(id: id, anchor: .bottom, animated: animated))
             }
             transitionMode(.pinnedToBottom)
             completion?()
@@ -133,7 +123,7 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
                 if bottomOffset > 0 {
                     scrollView.setContentOffset(
                         CGPoint(x: 0, y: bottomOffset),
-                        animated: attempt == 1 // animate first attempt, snap subsequent
+                        animated: animated && attempt == 1 // animate first attempt, snap subsequent
                     )
                 }
                 self.transitionMode(.pinnedToBottom)

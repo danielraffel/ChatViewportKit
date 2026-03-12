@@ -172,7 +172,7 @@ The repo includes a **Transcript Lab** example app (`Example/`) that exercises e
 
 **Scroll controls**: Jump to bottom, jump to top, scroll to middle by ID.
 
-**Height mutation**: Expand the last message to 200pt, or trigger an async height grow on a random message after a 0.5s delay (simulating image load).
+**Height mutation**: **Expand** sets the last message to 200pt tall (simulates a card or embed loading in-place). **Grow** picks a random message and increases its height to 150pt after a 0.5s delay (simulates an image finishing download — tests that async height changes don't jump the viewport).
 
 **Dynamic type**: Toggle between standard and accessibility-XXL text sizes mid-browse.
 

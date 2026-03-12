@@ -40,13 +40,6 @@ struct TranscriptLabView: View {
             }
             .navigationTitle("Transcript Lab")
             .navigationBarTitleDisplayMode(.inline)
-            .onAppear {
-                // Start with a few messages to demonstrate bottom anchoring
-                for _ in 0..<3 {
-                    messages.append(LabMessage(text: "Message \(nextIndex)"))
-                    nextIndex += 1
-                }
-            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(showDebugHUD ? "Hide HUD" : "Show HUD") {
@@ -124,12 +117,15 @@ struct TranscriptLabView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     Group {
-                        Button("Prepend 5") { prependMessages(5) }
+                        Button("Pre 1") { prependMessages(1) }
+                        Button("Pre 5") { prependMessages(5) }
+                        Button("Pre 10") { prependMessages(10) }
+                        Button("Pre 50") { prependMessages(50) }
                         Button("⬇ Bottom") { controller.scrollToBottom() }
                         Button("⬆ Top") { controller.scrollToTop() }
                         Button("→ Mid") { scrollToMiddle() }
-                        Button("Expand Last") { expandLastMessage() }
-                        Button("Async Grow") { asyncGrowRandomMessage() }
+                        Button("Expand") { expandLastMessage() }
+                        Button("Grow") { asyncGrowRandomMessage() }
                         Button("Clear") { resetWith(count: 0) }
                     }
                     .buttonStyle(.bordered)
@@ -165,14 +161,14 @@ struct TranscriptLabView: View {
     }
 
     private func prependMessages(_ count: Int) {
-        withAnimation {
-            var newMessages: [LabMessage] = []
-            for _ in 0..<count {
-                prependCounter += 1
-                newMessages.append(LabMessage(text: "History \(prependCounter) (prepended)"))
-            }
-            messages.insert(contentsOf: newMessages, at: 0)
+        controller.prepareToPrepend()
+        var newMessages: [LabMessage] = []
+        for _ in 0..<count {
+            prependCounter += 1
+            newMessages.append(LabMessage(text: "History \(prependCounter)"))
         }
+        messages.insert(contentsOf: newMessages, at: 0)
+        testLog = "Prepended \(count)"
     }
 
     private func scrollToMiddle() {
@@ -198,6 +194,80 @@ struct TranscriptLabView: View {
             messages[messages.count - 1].extraHeight = 200
             messages[messages.count - 1].text += "\n[Expanded to 200pt]"
         }
+    }
+
+    // MARK: - Automated Prepend Test
+
+    private func runPrependTests() {
+        // Setup: add 50 messages
+        for _ in 0..<49 {
+            messages.append(LabMessage(text: "Message \(nextIndex)"))
+            nextIndex += 1
+        }
+
+        // Scroll to middle (message 25)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            let targetIdx = 24
+            let targetID = messages[targetIdx].id
+            controller.scrollTo(id: targetID, anchor: .top, animated: false)
+            testLog = "At: \(messages[targetIdx].text)"
+        }
+
+        // Test 1: Prepend 1
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            let visibleBefore = findVisibleMessageText()
+            controller.prepareToPrepend()
+            prependCounter += 1
+            messages.insert(LabMessage(text: "History \(prependCounter)"), at: 0)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                let visibleAfter = findVisibleMessageText()
+                testLog = "Pre1: \(visibleBefore) → \(visibleAfter)"
+                NSLog("[TEST] Prepend 1: before=\(visibleBefore) after=\(visibleAfter)")
+            }
+        }
+
+        // Test 2: Prepend 10
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+            let visibleBefore = findVisibleMessageText()
+            controller.prepareToPrepend()
+            var batch: [LabMessage] = []
+            for _ in 0..<10 {
+                prependCounter += 1
+                batch.append(LabMessage(text: "History \(prependCounter)"))
+            }
+            messages.insert(contentsOf: batch, at: 0)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                let visibleAfter = findVisibleMessageText()
+                testLog = "Pre10: \(visibleBefore) → \(visibleAfter)"
+                NSLog("[TEST] Prepend 10: before=\(visibleBefore) after=\(visibleAfter)")
+            }
+        }
+
+        // Test 3: Prepend 50
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            let visibleBefore = findVisibleMessageText()
+            controller.prepareToPrepend()
+            var batch: [LabMessage] = []
+            for _ in 0..<50 {
+                prependCounter += 1
+                batch.append(LabMessage(text: "History \(prependCounter)"))
+            }
+            messages.insert(contentsOf: batch, at: 0)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                let visibleAfter = findVisibleMessageText()
+                testLog = "Pre50: \(visibleBefore) → \(visibleAfter)"
+                NSLog("[TEST] Prepend 50: before=\(visibleBefore) after=\(visibleAfter)")
+            }
+        }
+    }
+
+    private func findVisibleMessageText() -> String {
+        // Use topVisibleItemID to find what's at the top of viewport
+        guard let topID = controller.topVisibleItemID,
+              let msg = messages.first(where: { $0.id == topID }) else {
+            return "unknown"
+        }
+        return msg.text
     }
 
     private func asyncGrowRandomMessage() {

@@ -86,15 +86,15 @@ Goal: Make new tail content feel correct in both underfilled and overflowing sta
 
 Goal: Keep history stable when older content is inserted or visible rows change height.
 
-- [ ] **3.1** Implement `AnchorSnapshot<ID>` capture: visible item ID, distance from viewport top, distance from bottom
-- [ ] **3.2** Implement anchor restoration after prepend: preserve top visible anchor screen position
-- [ ] **3.3** Implement anchor restoration while pinned: preserve bottom distance
-- [ ] **3.4** Handle async image loads causing row height expansion without viewport jump
-- [ ] **3.5** Handle message editing causing row height changes without viewport jump
-- [ ] **3.6** Implement private UIScrollView offset bridge for pixel-precise correction after layout settles
-- [ ] **3.7** Rules for bridge: render tree stays ScrollView + LazyVStack, no UIKit exposed to consumers, bridge only for final offset correction
-- [ ] **3.8** Implement unified update pipeline: classify → capture anchor → apply data → settle → restore → animate → recompute mode
-- [ ] **3.9** Test prepend with 1, 10, 50 older messages — no visible jump
+- [x] **3.1** Implement `AnchorSnapshot<ID>` capture: visible item ID, distance from viewport top, distance from bottom
+- [x] **3.2** Implement anchor restoration after prepend: preserve top visible anchor screen position
+- [x] **3.3** Implement anchor restoration while pinned: preserve bottom distance
+- [x] **3.4** Handle async image loads causing row height expansion without viewport jump
+- [x] **3.5** Handle message editing causing row height changes without viewport jump
+- [x] **3.6** Implement private UIScrollView offset bridge for pixel-precise correction after layout settles — Implemented: ScrollViewBridge finds hosting UIScrollView via view hierarchy traversal; used for contentOffset adjustment on large prepends (50+ items) where proxy.scrollTo fails
+- [x] **3.7** Rules for bridge: render tree stays ScrollView + LazyVStack, no UIKit exposed to consumers, bridge only for final offset correction
+- [x] **3.8** Implement unified update pipeline: classify → capture anchor → apply data → settle → restore → animate → recompute mode
+- [x] **3.9** Test prepend with 1, 10, 50 older messages — no visible jump
 - [ ] **3.10** Test dynamic type size change mid-browsing — no position disturbance
 - [ ] **3.11** Performance: prepend of 50 messages must complete anchor restoration within one frame
 

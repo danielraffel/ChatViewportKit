@@ -86,6 +86,28 @@ SwiftUI's ScrollView + LazyVStack with proper item IDs handles all three gate te
 - Scrolling with LazyVStack is inherently 60fps since only visible rows are rendered/laid out
 - Bulk insert of 5000 items: no visible hang (112ms is under one animation frame budget at 60fps)
 
+## UIScrollView Bridge Implementation
+
+### ScrollViewBridge placement matters
+- The `ScrollViewBridge` (UIViewRepresentable) must be placed INSIDE the ScrollView content (e.g., as `.background()` on the LazyVStack), NOT on the ScrollView itself
+- Placing it as `.background()` on the ScrollView makes the bridge view a sibling of the UIScrollView, not a descendant
+- The bridge traverses the view hierarchy upward (`superview` chain) to find the UIScrollView, so it must be a descendant
+- Symptom of wrong placement: `scrollViewRef` stays nil
+
+### Prepend detection via freezeAnchor flag
+- Do NOT detect prepend by comparing first/last IDs in `onChange(of: data.count)`
+- SwiftUI's `onChange` closure may capture stale `data` references from a previous render cycle
+- This causes `currentLastID == previousLastID` comparisons to be unreliable
+- **Solution**: Use the `controller.freezeAnchor` flag (set by `prepareToPrepend()`) as the definitive prepend signal
+- This is more reliable because it's set by the host before the data mutation, not derived from stale view state
+
+### Prepend offset correction timing
+- `setContentOffset` called synchronously in `onChange(of: data.count)` gets overridden by SwiftUI's next layout pass
+- **Solution**: Capture `contentOffset.y` and `contentSize.height` before the layout pass, then adjust after a short delay (`DispatchQueue.main.asyncAfter(deadline: .now() + 0.05)`)
+- After layout, `contentSize.height` reflects the new items; `delta = newSize - capturedSize` gives the exact offset adjustment needed
+- Formula: `newOffset.y = capturedOffsetY + delta`
+- Tested and verified for prepend counts of 1, 10, and 50 items — all preserve scroll position
+
 ## Apple Documentation References
 
 (Add links to relevant Apple docs discovered via sosumi MCP here)

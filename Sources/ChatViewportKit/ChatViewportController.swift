@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Controller for imperative scroll commands and viewport state on a `ChatViewport`.
 public final class ChatViewportController<ID: Hashable>: ObservableObject {
@@ -19,6 +20,21 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
     internal var firstItemID: ID?
     internal var lastItemID: ID?
 
+    /// The ID of the topmost visible item, continuously updated by preference key.
+    /// Used for anchor restoration on prepend.
+    public internal(set) var topVisibleItemID: ID?
+
+    /// When true, the preference key update is skipped for one cycle.
+    /// This preserves the pre-change anchor during a data mutation.
+    internal var freezeAnchor: Bool = false
+
+    /// Weak reference to the hosting UIScrollView for direct contentOffset manipulation.
+    /// Set by ScrollViewBridge; used for pixel-precise prepend offset correction.
+    internal weak var scrollViewRef: UIScrollView?
+
+    /// Whether the UIScrollView bridge has been established (for debugging).
+    public var hasScrollViewRef: Bool { scrollViewRef != nil }
+
     /// Generation counter to prevent stale commands from executing.
     /// Incremented each time a new command is issued; the view checks
     /// this before executing to skip superseded commands.
@@ -28,6 +44,12 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
     public var onBottomPinnedChanged: ((Bool) -> Void)?
 
     public init() {}
+
+    /// Call before prepending data to freeze the current visible anchor.
+    /// This ensures position restoration works correctly after prepend.
+    public func prepareToPrepend() {
+        freezeAnchor = true
+    }
 
     // MARK: - Public API
 

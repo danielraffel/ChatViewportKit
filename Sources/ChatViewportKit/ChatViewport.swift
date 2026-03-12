@@ -18,7 +18,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     @State private var contentHeight: CGFloat = 0
     @State private var scrollProxy: ScrollViewProxy?
     @State private var previousCount: Int = 0
-    @State private var previousLastID: ID?
+    @State private var previousContentHeight: CGFloat = 0
 
     public init(
         _ data: Data,
@@ -72,19 +72,29 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                                 )
                         }
                     )
+                    .background(
+                        ScrollViewBridge { scrollView in
+                            controller.scrollViewRef = scrollView
+                        }
+                    )
                 }
                 .coordinateSpace(name: viewportCoordinateSpace)
                 .onPreferenceChange(ContentHeightPreference.self) { height in
+                    previousContentHeight = contentHeight
                     contentHeight = height
                 }
                 .onPreferenceChange(ScrollOffsetPreference.self) { offset in
                     updateBottomPinState(scrollOffset: offset)
                 }
+                .onPreferenceChange(RowFramesPreference<ID>.self) { frames in
+                    guard !controller.freezeAnchor else { return }
+                    let sorted = frames.sorted { $0.minY < $1.minY }
+                    controller.topVisibleItemID = sorted.first(where: { $0.maxY > 0 })?.id
+                }
                 .onAppear {
                     scrollProxy = proxy
                     viewportHeight = outerProxy.size.height
                     previousCount = data.count
-                    previousLastID = data.last?[keyPath: idKeyPath]
                     updateControllerIDs()
                 }
                 .onChange(of: outerProxy.size.height) { newHeight in
@@ -93,16 +103,52 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                 .onChange(of: data.count) { newCount in
                     let currentLastID = data.last?[keyPath: idKeyPath]
                     updateControllerIDs()
-                    // Auto-scroll to bottom only when items are appended (last ID changed)
-                    // and we are currently pinned to bottom
-                    let isAppend = newCount > previousCount && currentLastID != previousLastID
-                    if isAppend && controller.isPinnedToBottom, let lastID = currentLastID {
+
+                    // Use freezeAnchor flag (set by prepareToPrepend) as the prepend signal.
+                    // This is more reliable than ID-change detection because SwiftUI's
+                    // onChange closure may capture stale data references.
+                    let isPrepend = controller.freezeAnchor && newCount > previousCount
+                    let isAppend = !isPrepend && newCount > previousCount
+
+                    if isPrepend {
+                        if let scrollView = controller.scrollViewRef {
+                            let capturedOffsetY = scrollView.contentOffset.y
+                            let capturedContentSize = scrollView.contentSize.height
+
+                            // Defer offset adjustment until after SwiftUI completes layout.
+                            // The contentSize will reflect the new items after the layout pass.
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                let newSize = scrollView.contentSize.height
+                                let delta = newSize - capturedContentSize
+                                if delta > 0 {
+                                    scrollView.setContentOffset(
+                                        CGPoint(x: 0, y: capturedOffsetY + delta),
+                                        animated: false
+                                    )
+                                } else {
+                                    // Fallback: estimate from average row height
+                                    let prependedCount = newCount - previousCount
+                                    let avgHeight = capturedContentSize / CGFloat(max(previousCount, 1))
+                                    let estimate = CGFloat(prependedCount) * avgHeight
+                                    scrollView.setContentOffset(
+                                        CGPoint(x: 0, y: capturedOffsetY + estimate),
+                                        animated: false
+                                    )
+                                }
+                                controller.freezeAnchor = false
+                            }
+                        } else if let anchorID = controller.topVisibleItemID {
+                            // Fallback: scrollTo works for small prepends within render window
+                            proxy.scrollTo(anchorID, anchor: .top)
+                            controller.freezeAnchor = false
+                        }
+                    } else if isAppend && controller.isPinnedToBottom, let lastID = currentLastID {
                         withAnimation {
                             proxy.scrollTo(lastID, anchor: .bottom)
                         }
                     }
+
                     previousCount = newCount
-                    previousLastID = currentLastID
                 }
                 .onChange(of: controller.pendingCommand) { command in
                     guard let command = command else { return }
@@ -135,9 +181,6 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
         controller.lastItemID = data.last?[keyPath: idKeyPath]
     }
 
-    /// Determine if we're pinned to bottom based on scroll offset.
-    /// scrollOffset is the content's minY in the viewport coordinate space.
-    /// When scrolled to bottom: contentHeight + scrollOffset ≈ viewportHeight
     private func updateBottomPinState(scrollOffset: CGFloat) {
         let distanceFromBottom = contentHeight + scrollOffset - viewportHeight
         let isAtBottom = distanceFromBottom <= configuration.bottomPinThreshold

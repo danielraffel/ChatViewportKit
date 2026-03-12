@@ -25,6 +25,8 @@ struct TranscriptLabView: View {
     @State private var showDebugHUD = true
     @State private var testLog: String = ""
     @State private var useAccessibilitySize = false
+    @State private var useLargeTitle = false
+    @State private var composerText = ""
 
     var body: some View {
         NavigationStack {
@@ -38,15 +40,27 @@ struct TranscriptLabView: View {
                 }
                 .environment(\.sizeCategory, useAccessibilitySize ? .accessibilityExtraExtraExtraLarge : .medium)
 
+                composerBar
                 controlBar
             }
             .navigationTitle("Transcript Lab")
-            .navigationBarTitleDisplayMode(.inline)
-            // .onAppear { runPrependTests() } // Uncomment for automated test
+            .navigationBarTitleDisplayMode(useLargeTitle ? .large : .inline)
+            .onAppear {
+                // Load 30 messages to test scrolling with large title
+                for _ in 0..<29 {
+                    messages.append(LabMessage(text: "Message \(nextIndex)"))
+                    nextIndex += 1
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(showDebugHUD ? "Hide HUD" : "Show HUD") {
-                        showDebugHUD.toggle()
+                    HStack(spacing: 8) {
+                        Button(useLargeTitle ? "Inline" : "Large") {
+                            useLargeTitle.toggle()
+                        }
+                        Button(showDebugHUD ? "HUD" : "HUD") {
+                            showDebugHUD.toggle()
+                        }
                     }
                     .font(.caption)
                 }
@@ -95,6 +109,29 @@ struct TranscriptLabView: View {
         case .programmaticScroll: return "programmaticScroll"
         case .correctingAfterDataChange: return "correcting"
         }
+    }
+
+    // MARK: - Composer
+
+    private var composerBar: some View {
+        HStack(spacing: 8) {
+            TextField("Type a message...", text: $composerText, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(1...5)
+            Button("Send") {
+                guard !composerText.isEmpty else { return }
+                withAnimation {
+                    messages.append(LabMessage(text: composerText))
+                    composerText = ""
+                    nextIndex += 1
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 6)
+        .background(Color(.systemBackground))
     }
 
     // MARK: - Controls
@@ -200,6 +237,26 @@ struct TranscriptLabView: View {
         withAnimation {
             messages[messages.count - 1].extraHeight = 200
             messages[messages.count - 1].text += "\n[Expanded to 200pt]"
+        }
+    }
+
+    // MARK: - Navigation Test
+
+    private func runNavTest() {
+        // Add 30 messages
+        for _ in 0..<29 {
+            messages.append(LabMessage(text: "Message \(nextIndex)"))
+            nextIndex += 1
+        }
+        // After a moment, switch to large title
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            useLargeTitle = true
+            testLog = "Large title mode"
+        }
+        // After more time, switch back to inline
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+            useLargeTitle = false
+            testLog = "Inline title mode"
         }
     }
 

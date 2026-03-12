@@ -146,6 +146,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                         withAnimation {
                             proxy.scrollTo(lastID, anchor: .bottom)
                         }
+                        UIAccessibility.post(notification: .pageScrolled, argument: nil)
                     }
 
                     previousCount = newCount
@@ -173,6 +174,8 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
             } else {
                 proxy.scrollTo(id, anchor: anchor)
             }
+            // Notify VoiceOver that the layout changed due to programmatic scroll
+            UIAccessibility.post(notification: .layoutChanged, argument: nil)
         }
     }
 

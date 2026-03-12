@@ -116,8 +116,8 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                             let capturedContentSize = scrollView.contentSize.height
 
                             // Defer offset adjustment until after SwiftUI completes layout.
-                            // The contentSize will reflect the new items after the layout pass.
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            // Using async (next run loop) is enough for SwiftUI to update contentSize.
+                            DispatchQueue.main.async {
                                 let newSize = scrollView.contentSize.height
                                 let delta = newSize - capturedContentSize
                                 if delta > 0 {

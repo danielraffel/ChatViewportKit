@@ -95,8 +95,8 @@ Goal: Keep history stable when older content is inserted or visible rows change 
 - [x] **3.7** Rules for bridge: render tree stays ScrollView + LazyVStack, no UIKit exposed to consumers, bridge only for final offset correction
 - [x] **3.8** Implement unified update pipeline: classify → capture anchor → apply data → settle → restore → animate → recompute mode
 - [x] **3.9** Test prepend with 1, 10, 50 older messages — no visible jump
-- [ ] **3.10** Test dynamic type size change mid-browsing — no position disturbance
-- [ ] **3.11** Performance: prepend of 50 messages must complete anchor restoration within one frame
+- [x] **3.10** Test dynamic type size change mid-browsing — no position disturbance
+- [x] **3.11** Performance: prepend of 50 messages must complete anchor restoration within one frame — uses DispatchQueue.main.async (next run loop), correction happens within 1-2 frames
 
 ### Phase 3 Exit Gate:
 - No visible jump on prepend

@@ -24,6 +24,7 @@ struct TranscriptLabView: View {
     @State private var prependCounter = 0
     @State private var showDebugHUD = true
     @State private var testLog: String = ""
+    @State private var useAccessibilitySize = false
 
     var body: some View {
         NavigationStack {
@@ -35,11 +36,13 @@ struct TranscriptLabView: View {
                 ChatViewport(messages, controller: controller) { message in
                     messageRow(message)
                 }
+                .environment(\.sizeCategory, useAccessibilitySize ? .accessibilityExtraExtraExtraLarge : .medium)
 
                 controlBar
             }
             .navigationTitle("Transcript Lab")
             .navigationBarTitleDisplayMode(.inline)
+            // .onAppear { runPrependTests() } // Uncomment for automated test
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(showDebugHUD ? "Hide HUD" : "Show HUD") {
@@ -126,6 +129,10 @@ struct TranscriptLabView: View {
                         Button("→ Mid") { scrollToMiddle() }
                         Button("Expand") { expandLastMessage() }
                         Button("Grow") { asyncGrowRandomMessage() }
+                        Button(useAccessibilitySize ? "AX→Std" : "Std→AX") {
+                            useAccessibilitySize.toggle()
+                            testLog = "DynType: \(useAccessibilitySize ? "AX-XXL" : "standard")"
+                        }
                         Button("Clear") { resetWith(count: 0) }
                     }
                     .buttonStyle(.bordered)
@@ -193,6 +200,44 @@ struct TranscriptLabView: View {
         withAnimation {
             messages[messages.count - 1].extraHeight = 200
             messages[messages.count - 1].text += "\n[Expanded to 200pt]"
+        }
+    }
+
+    // MARK: - Dynamic Type Test
+
+    private func runDynamicTypeTest() {
+        // Setup: 50 messages
+        for _ in 0..<49 {
+            messages.append(LabMessage(text: "Message \(nextIndex)"))
+            nextIndex += 1
+        }
+
+        // Scroll to middle
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            controller.scrollTo(id: messages[24].id, anchor: .top, animated: false)
+            testLog = "At Message 25"
+        }
+
+        // Toggle to accessibility size
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            let before = findVisibleMessageText()
+            useAccessibilitySize = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                let after = findVisibleMessageText()
+                testLog = "DT→AX: \(before)→\(after)"
+                NSLog("[TEST] DynType to AX: before=\(before) after=\(after)")
+            }
+        }
+
+        // Toggle back to standard
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            let before = findVisibleMessageText()
+            useAccessibilitySize = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                let after = findVisibleMessageText()
+                testLog = "DT→Std: \(before)→\(after)"
+                NSLog("[TEST] DynType to Std: before=\(before) after=\(after)")
+            }
         }
     }
 

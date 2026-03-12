@@ -134,6 +134,7 @@ struct TranscriptLabView: View {
                     composerText = ""
                     nextIndex += 1
                 }
+                controller.scrollToBottom()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)

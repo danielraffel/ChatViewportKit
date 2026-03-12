@@ -12,7 +12,7 @@ public struct ChatViewportConfiguration: Equatable {
 
     public init(
         spacing: CGFloat = 8,
-        bottomPinThreshold: CGFloat = 24,
+        bottomPinThreshold: CGFloat = 50,
         topLoadTriggerOffset: CGFloat = 80,
         showsIndicators: Bool = true,
         animateTailInsertions: Bool = true,

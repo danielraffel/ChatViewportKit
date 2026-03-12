@@ -82,6 +82,9 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
     /// Whether the anchor is currently frozen (for debugging).
     public var freezeAnchorState: Bool { freezeAnchor }
 
+    /// Number of measured heights in the index (for debugging).
+    public var heightIndexCount: Int { heightIndex.heights.count }
+
     /// Debug: distance from the bottom of the scroll view content.
     /// Returns nil if the scroll view bridge isn't established.
     public var distanceFromBottom: CGFloat? {
@@ -216,6 +219,7 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
     public func scrollTo(id: ID, anchor: UnitPoint = .center, animated: Bool = true) {
         // If no bridge, fall back to ScrollViewProxy (works for nearby items).
         guard let scrollView = scrollViewRef else {
+            // print("[PROBE] scrollTo: no bridge, falling back to proxy")
             issueCommand(.scrollTo(id: id, anchor: anchor, animated: animated))
             transitionMode(.freeBrowsing(anchor: nil))
             return
@@ -223,6 +227,7 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
 
         // Check if target is already measured and nearby — skip probing
         if heightIndex.heights[id] != nil {
+            // print("[PROBE] scrollTo: target already measured, using proxy")
             // Target has been materialized before. Try direct proxy scroll first.
             // For nearby items this is sufficient and avoids overlay flash.
             issueCommand(.scrollTo(id: id, anchor: anchor, animated: animated))
@@ -230,6 +235,7 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
             return
         }
 
+        // print("[PROBE] scrollTo: target NOT measured, starting probe-align. Heights: \(heightIndex.heights.count), orderedIDs: \(orderedIDs.count)")
         // Far target — use probe-align engine
         startProbeAlign(targetID: id, anchor: anchor, animated: animated, scrollView: scrollView)
     }
@@ -240,6 +246,7 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
     /// Dynamic Type changes, or any layout-affecting change (design rule 4a).
     internal func cancelProbeSession() {
         guard idScrollInFlight else { return }
+        // print("[PROBE] CANCELLED — session aborted")
         probeSessionGeneration &+= 1
         cleanupProbeSession()
     }
@@ -266,17 +273,36 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
             snapshot.frame = scrollView.frame
             superview.addSubview(snapshot)
             probeOverlay = snapshot
+            // print("[PROBE] Overlay attached to superview")
+        } else {
+            // print("[PROBE] WARNING: no superview for overlay")
         }
 
-        // Step 2: Compute estimated offset from HeightIndex
-        let estimatedOffset = heightIndex.estimatedOffset(
-            to: targetID,
-            in: orderedIDs,
-            spacing: configSpacing
-        )
+        // Step 2: Compute estimated offset.
+        // Use proportional estimate from contentSize when few heights are measured,
+        // since small samples from the bottom can have unrepresentative averages.
+        let estimatedOffset: CGFloat
+        let targetIdx = orderedIDs.firstIndex(of: targetID)
+        let contentSize = scrollView.contentSize.height
+
+        if heightIndex.heights.count > 100, let _ = targetIdx {
+            estimatedOffset = heightIndex.estimatedOffset(
+                to: targetID, in: orderedIDs, spacing: configSpacing
+            )
+        } else if let idx = targetIdx {
+            // Proportional estimate — contentSize includes all variable heights
+            estimatedOffset = contentSize * (CGFloat(idx) / CGFloat(orderedIDs.count))
+        } else {
+            estimatedOffset = heightIndex.estimatedOffset(
+                to: targetID, in: orderedIDs, spacing: configSpacing
+            )
+        }
+
+        // print("[PROBE] estimatedOffset=\(Int(estimatedOffset)), measured=\(heightIndex.heights.count), contentSize=\(Int(contentSize))")
 
         // Step 3: Jump to estimated position (snap, not animated)
         let topInset = scrollView.adjustedContentInset.top
+        // print("[PROBE] Jumping to y=\(estimatedOffset - topInset), topInset=\(topInset)")
         scrollView.setContentOffset(CGPoint(x: 0, y: estimatedOffset - topInset), animated: false)
 
         // Step 4: Wait for layout to settle, then refine (two async hops — design rule 7).
@@ -302,6 +328,7 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
         passNumber: Int,
         maxPasses: Int
     ) {
+        // print("[PROBE] probePass \(passNumber)/\(maxPasses)")
         // First async hop: let SwiftUI materialize views at new offset
         DispatchQueue.main.async { [weak self, weak scrollView] in
             guard let self = self, let scrollView = scrollView else { return }
@@ -310,81 +337,123 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
             // Flush UIKit layout
             scrollView.layoutIfNeeded()
 
-            // Second async hop: let SwiftUI preferences propagate
-            // iOS 16 may need extra time — 50ms fallback (design rule 7)
-            let delay: TimeInterval = passNumber == 1 ? 0.05 : 0.03
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self, weak scrollView] in
+            // Second async hop: wait for SwiftUI to materialize lazy content and propagate preferences.
+            // 250ms gives time for large datasets with variable heights. Two hops total (design rule 7).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self, weak scrollView] in
                 guard let self = self, let scrollView = scrollView else { return }
                 guard self.probeSessionGeneration == sessionGen, self.idScrollInFlight else { return }
 
+                scrollView.layoutIfNeeded()
+                // print("[PROBE] probePass \(passNumber): heights=\(self.heightIndex.heights.count)")
+
                 // Check if target is now measured
                 if let measuredHeight = self.heightIndex.heights[targetID] {
-                    // Target materialized — recompute precise offset
-                    let preciseOffset = self.heightIndex.estimatedOffset(
-                        to: targetID,
-                        in: self.orderedIDs,
-                        spacing: self.configSpacing
+                    // print("[PROBE] TARGET FOUND! measuredHeight=\(measuredHeight)")
+                    self.finishProbeWithTarget(
+                        targetID: targetID, measuredHeight: measuredHeight,
+                        anchor: anchor, animated: animated, scrollView: scrollView
                     )
-                    let topInset = scrollView.adjustedContentInset.top
-                    var targetY = preciseOffset - topInset
-
-                    // Adjust for anchor position (design rule 9)
-                    if anchor == .center {
-                        let viewportHeight = scrollView.bounds.height
-                        targetY = preciseOffset - topInset - (viewportHeight - measuredHeight) / 2
-                    } else if anchor == .bottom {
-                        let viewportHeight = scrollView.bounds.height
-                        targetY = preciseOffset - topInset - viewportHeight + measuredHeight
-                    }
-                    // .top is the default — no adjustment needed
-
-                    // Clamp to valid range
-                    let maxOffset = scrollView.contentSize.height - scrollView.bounds.height + scrollView.contentInset.bottom
-                    targetY = min(max(targetY, -topInset), maxOffset)
-
-                    let currentOffset = scrollView.contentOffset.y
-                    let residual = abs(targetY - currentOffset)
-
-                    // Snap correction; animate only tiny residuals (design rule 8)
-                    let shouldAnimate = animated && residual < 100
-                    // Respect Reduce Motion
-                    let reduceMotion = UIAccessibility.isReduceMotionEnabled
-                    scrollView.setContentOffset(
-                        CGPoint(x: 0, y: targetY),
-                        animated: shouldAnimate && !reduceMotion
-                    )
-
-                    // Done — remove overlay and clean up
-                    self.finishProbeSession(animated: shouldAnimate && !reduceMotion)
-                    self.transitionMode(.freeBrowsing(anchor: nil))
-                    UIAccessibility.post(notification: .layoutChanged, argument: nil)
                 } else if passNumber < maxPasses {
-                    // Target not yet materialized — re-estimate and try again
-                    let reEstimate = self.heightIndex.estimatedOffset(
-                        to: targetID,
-                        in: self.orderedIDs,
-                        spacing: self.configSpacing
-                    )
-                    let topInset = scrollView.adjustedContentInset.top
-                    scrollView.setContentOffset(CGPoint(x: 0, y: reEstimate - topInset), animated: false)
-
-                    self.probePass(
-                        targetID: targetID,
-                        anchor: anchor,
-                        animated: animated,
-                        scrollView: scrollView,
-                        sessionGen: sessionGen,
-                        passNumber: passNumber + 1,
-                        maxPasses: maxPasses
+                    // Correct offset using topVisibleItemID if available
+                    self.correctAndRetry(
+                        targetID: targetID, anchor: anchor, animated: animated,
+                        scrollView: scrollView, sessionGen: sessionGen,
+                        passNumber: passNumber, maxPasses: maxPasses
                     )
                 } else {
-                    // Max passes exhausted — use best effort position and clean up
+                    // print("[PROBE] MAX PASSES EXHAUSTED, falling back to proxy")
                     self.finishProbeSession(animated: false)
                     self.transitionMode(.freeBrowsing(anchor: nil))
-                    // Fall back to proxy scroll as last resort
                     self.issueCommand(.scrollTo(id: targetID, anchor: anchor, animated: false))
                 }
             }
+        }
+    }
+
+    /// Called when probe finds the target — compute precise offset and snap to it.
+    private func finishProbeWithTarget(
+        targetID: ID, measuredHeight: CGFloat,
+        anchor: UnitPoint, animated: Bool, scrollView: UIScrollView
+    ) {
+        let preciseOffset = heightIndex.estimatedOffset(
+            to: targetID, in: orderedIDs, spacing: configSpacing
+        )
+        let topInset = scrollView.adjustedContentInset.top
+        var targetY = preciseOffset - topInset
+
+        // Adjust for anchor position (design rule 9)
+        if anchor == .center {
+            let viewportHeight = scrollView.bounds.height
+            targetY = preciseOffset - topInset - (viewportHeight - measuredHeight) / 2
+        } else if anchor == .bottom {
+            let viewportHeight = scrollView.bounds.height
+            targetY = preciseOffset - topInset - viewportHeight + measuredHeight
+        }
+
+        // Clamp to valid range
+        let maxOffset = scrollView.contentSize.height - scrollView.bounds.height + scrollView.contentInset.bottom
+        targetY = min(max(targetY, -topInset), maxOffset)
+
+        let residual = abs(targetY - scrollView.contentOffset.y)
+        let shouldAnimate = animated && residual < 100
+        let reduceMotion = UIAccessibility.isReduceMotionEnabled
+        scrollView.setContentOffset(
+            CGPoint(x: 0, y: targetY),
+            animated: shouldAnimate && !reduceMotion
+        )
+
+        finishProbeSession(animated: shouldAnimate && !reduceMotion)
+        transitionMode(.freeBrowsing(anchor: nil))
+        UIAccessibility.post(notification: .layoutChanged, argument: nil)
+    }
+
+    /// Called when probe doesn't find the target — correct offset and schedule next pass.
+    private func correctAndRetry(
+        targetID: ID, anchor: UnitPoint, animated: Bool,
+        scrollView: UIScrollView, sessionGen: UInt64,
+        passNumber: Int, maxPasses: Int
+    ) {
+        let topInset = scrollView.adjustedContentInset.top
+        let currentOffset = scrollView.contentOffset.y
+        let targetIdx = orderedIDs.firstIndex(of: targetID)
+
+        if let visibleID = topVisibleItemID,
+           let visibleIdx = orderedIDs.firstIndex(of: visibleID),
+           let targIdx = targetIdx {
+            // Use proportional per-item offset from contentSize (more accurate than
+            // avgHeight when samples are few or heights vary significantly).
+            let delta = targIdx - visibleIdx
+            let contentSize = scrollView.contentSize.height
+            let perItem = contentSize / CGFloat(orderedIDs.count)
+            let jump = CGFloat(delta) * perItem
+            let correctedOffset = currentOffset + jump
+            // print("[PROBE] pass \(passNumber): visible=\(visibleIdx), target=\(targIdx), delta=\(delta), perItem=\(String(format: "%.1f", perItem))")
+            scrollView.setContentOffset(CGPoint(x: 0, y: correctedOffset), animated: false)
+        } else if let targIdx = targetIdx {
+            // No visible anchor. Use proportional estimate from content size
+            // (more reliable than heightIndex average with few samples).
+            let contentSize = scrollView.contentSize.height
+            let total = CGFloat(orderedIDs.count)
+            let proportionalOffset = contentSize * (CGFloat(targIdx) / total)
+            // print("[PROBE] pass \(passNumber): proportional re-estimate to \(Int(proportionalOffset))")
+            scrollView.setContentOffset(CGPoint(x: 0, y: proportionalOffset - topInset), animated: false)
+        } else {
+            let reEstimate = heightIndex.estimatedOffset(
+                to: targetID, in: orderedIDs, spacing: configSpacing
+            )
+            // print("[PROBE] pass \(passNumber): fallback re-estimate to \(Int(reEstimate))")
+            scrollView.setContentOffset(CGPoint(x: 0, y: reEstimate - topInset), animated: false)
+        }
+
+        // Wait for SwiftUI to materialize content at corrected offset before next pass
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self, weak scrollView] in
+            guard let self = self, let scrollView = scrollView else { return }
+            guard self.probeSessionGeneration == sessionGen, self.idScrollInFlight else { return }
+            self.probePass(
+                targetID: targetID, anchor: anchor, animated: animated,
+                scrollView: scrollView, sessionGen: sessionGen,
+                passNumber: passNumber + 1, maxPasses: maxPasses
+            )
         }
     }
 

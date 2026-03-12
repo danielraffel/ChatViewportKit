@@ -42,8 +42,19 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
         // Also capture pinned state BEFORE preferences fire — large appends cause
         // ScrollOffsetPreference to transition mode to freeBrowsing before onChange runs.
         let _ = {
-            controller.firstItemID = data.first?[keyPath: idKeyPath]
-            controller.lastItemID = data.last?[keyPath: idKeyPath]
+            let newFirst = data.first?[keyPath: idKeyPath]
+            let newLast = data.last?[keyPath: idKeyPath]
+
+            // Detect full data replacement (both first and last IDs changed).
+            // Invalidate height index so stale entries don't corrupt averageHeight.
+            let firstChanged = newFirst != controller.firstItemID
+            let lastChanged = newLast != controller.lastItemID
+            if firstChanged && lastChanged && controller.firstItemID != nil {
+                controller.heightIndex.invalidateAll()
+            }
+
+            controller.firstItemID = newFirst
+            controller.lastItemID = newLast
             // Update ordered IDs for probe-align (design rule 5: lazy, only rebuilt here).
             // Read from data during body evaluation where it's always fresh.
             controller.orderedIDs = data.map { $0[keyPath: idKeyPath] }

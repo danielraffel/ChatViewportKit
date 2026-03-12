@@ -27,6 +27,7 @@ struct TranscriptLabView: View {
     @State private var useAccessibilitySize = false
     @State private var useLargeTitle = false
     @State private var composerText = ""
+    @State private var jumpToIndex = ""
 
     var body: some View {
         NavigationStack {
@@ -50,7 +51,12 @@ struct TranscriptLabView: View {
             .navigationTitle("Transcript Lab")
             .navigationBarTitleDisplayMode(useLargeTitle ? .large : .inline)
             // .onAppear { runAutoScrollTest() } // Uncomment for automated tests
+            // .onAppear { runProbeAlignTest() } // Uncomment to test probe-align
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Mid") { scrollToMiddle() }
+                        .font(.caption)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
                         Button(useLargeTitle ? "Inline" : "Title") {
@@ -100,6 +106,7 @@ struct TranscriptLabView: View {
                     Text("Top: \(topVisibleText)")
                     Text("SV: \(controller.hasScrollViewRef ? "Y" : "N")")
                     Text("Freeze: \(controller.freezeAnchorState ? "Y" : "N")")
+                    Text("HIdx: \(controller.heightIndexCount)/\(messages.count)")
                 }
             }
             if !testLog.isEmpty {
@@ -200,12 +207,21 @@ struct TranscriptLabView: View {
                         Button("⬇ Bottom") { controller.scrollToBottom() }
                         Button("⬆ Top") { controller.scrollToTop() }
                         Button("→ Mid") { scrollToMiddle() }
+                        HStack(spacing: 2) {
+                            TextField("#", text: $jumpToIndex)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 50)
+                                .keyboardType(.numberPad)
+                            Button("Go") { jumpToMessageIndex() }
+                        }
                         Button("Expand") { expandLastMessage() }
                         Button("Grow") { asyncGrowRandomMessage() }
                         Button(useAccessibilitySize ? "AX→Std" : "Std→AX") {
                             useAccessibilitySize.toggle()
                             testLog = "DynType: \(useAccessibilitySize ? "AX-XXL" : "standard")"
                         }
+                        Button("Stress") { runStressTest() }
+                        Button("VarH") { loadVariableHeights() }
                         Button("Clear") { resetWith(count: 0) }
                     }
                     .buttonStyle(.bordered)
@@ -259,6 +275,16 @@ struct TranscriptLabView: View {
         guard messages.count >= 3 else { return }
         let midIndex = messages.count / 2
         controller.scrollTo(id: messages[midIndex].id)
+    }
+
+    private func jumpToMessageIndex() {
+        guard let idx = Int(jumpToIndex), idx > 0, idx <= messages.count else {
+            testLog = "Invalid index: \(jumpToIndex)"
+            return
+        }
+        let target = messages[idx - 1]
+        testLog = "Jump → \(target.text)"
+        controller.scrollTo(id: target.id, anchor: .center)
     }
 
     private func resetWith(count: Int) {
@@ -593,6 +619,72 @@ struct TranscriptLabView: View {
                 }
             }
             delay += checkDelay + 0.5 // time for append + check + buffer
+        }
+    }
+
+    private func loadVariableHeights() {
+        var batch: [LabMessage] = []
+        for i in 1...10000 {
+            let extra: CGFloat? = i % 3 == 0 ? CGFloat(60 + (i % 100)) : nil
+            batch.append(LabMessage(text: "VarH \(i)", extraHeight: extra))
+        }
+        messages = batch
+        nextIndex = 10001
+        testLog = "10K variable heights loaded"
+    }
+
+    private func runProbeAlignTest() {
+        // Test 1: 10K uniform → scroll to 5000
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            print("[PROBE-TEST] Test 1: Loading 10K uniform messages...")
+            var batch: [LabMessage] = []
+            for i in 1...10000 {
+                batch.append(LabMessage(text: "Message \(i)"))
+            }
+            messages = batch
+            nextIndex = 10001
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            let targetIdx = 5000
+            print("[PROBE-TEST] Test 1: scrollTo \(targetIdx) (center), heights=\(controller.heightIndexCount)/\(messages.count)")
+            controller.scrollTo(id: messages[targetIdx].id, anchor: .center)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
+            let visible = findVisibleMessageText()
+            print("[PROBE-TEST] Test 1 result: visible=\(visible)")
+            testLog = "T1: \(visible)"
+        }
+
+        // Test 2: Scroll to bottom first, then load variable heights and probe to 5000
+        DispatchQueue.main.asyncAfter(deadline: .now() + 7.0) {
+            print("[PROBE-TEST] Test 2: Scrolling to bottom before reload...")
+            controller.scrollToBottom(animated: false)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+            print("[PROBE-TEST] Test 2: Loading 10K variable-height messages...")
+            var batch: [LabMessage] = []
+            for i in 1...10000 {
+                let extra: CGFloat? = i % 3 == 0 ? CGFloat(60 + (i % 100)) : nil
+                batch.append(LabMessage(text: "VarH \(i)", extraHeight: extra))
+            }
+            messages = batch
+            nextIndex = 10001
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+            let targetIdx = 5000
+            print("[PROBE-TEST] Test 2: scrollTo \(targetIdx) (center), heights=\(controller.heightIndexCount)/\(messages.count)")
+            controller.scrollTo(id: messages[targetIdx].id, anchor: .center)
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 13.0) {
+            let visible = findVisibleMessageText()
+            print("[PROBE-TEST] Test 2 result: visible=\(visible)")
+            testLog += " | T2: \(visible)"
+            print("[PROBE-TEST] ALL TESTS COMPLETE")
         }
     }
 

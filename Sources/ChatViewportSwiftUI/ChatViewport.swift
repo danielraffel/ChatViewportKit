@@ -44,6 +44,10 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
         let _ = {
             controller.firstItemID = data.first?[keyPath: idKeyPath]
             controller.lastItemID = data.last?[keyPath: idKeyPath]
+            // Update ordered IDs for probe-align (design rule 5: lazy, only rebuilt here).
+            // Read from data during body evaluation where it's always fresh.
+            controller.orderedIDs = data.map { $0[keyPath: idKeyPath] }
+            controller.configSpacing = configuration.spacing
             if data.count != previousCount {
                 // If an auto-scroll is already in flight (burst append), preserve intent.
                 // Otherwise capture the actual pinned state before preferences fire.
@@ -133,12 +137,17 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                         // Width change invalidates all cached heights — row content
                         // will re-layout at new width with different heights.
                         controller.heightIndex.invalidateAll()
+                        // Cancel in-flight probe sessions (design rule 4a).
+                        controller.cancelProbeSession()
                     }
                 }
                 .onChange(of: data.count) { newCount in
                     // NOTE: do NOT read `data` here — it may be stale.
                     // Use controller.firstItemID / controller.lastItemID which were
                     // updated during body evaluation with fresh data.
+
+                    // Cancel in-flight probe sessions on data change (design rule 4a).
+                    controller.cancelProbeSession()
 
                     let isPrepend = controller.freezeAnchor && newCount > previousCount
                     let isAppend = !isPrepend && newCount > previousCount
@@ -217,6 +226,10 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     }
 
     private func updateBottomPinState(scrollOffset: CGFloat) {
+        // Don't transition mode during probe-align session (design rule 4).
+        // The probe engine owns mode transitions until it completes.
+        guard !controller.idScrollInFlight else { return }
+
         let distanceFromBottom = contentHeight + scrollOffset - viewportHeight
         let isAtBottom = distanceFromBottom <= configuration.bottomPinThreshold
         let isUnderfilled = contentHeight <= viewportHeight

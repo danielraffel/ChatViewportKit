@@ -31,12 +31,12 @@
 - [x] 22. Verify no flash, all behaviors intact
 
 ## Phase B1: UICollectionView Foundation
-- [ ] 23. Create ChatViewportUIKit target
-- [ ] 24. Create UKChatViewportController
-- [ ] 25. Create UKChatViewport (UIViewRepresentable)
-- [ ] 26. Create UKHostingCell
-- [ ] 27. Create UKBottomAnchoredLayout
-- [ ] 28. Create UKDataSource
+- [x] 23. Create ChatViewportUIKit target
+- [x] 24. Create UKChatViewportController
+- [x] 25. Create UKChatViewport (UIViewRepresentable)
+- [x] 26. Create UKHostingCell
+- [x] 27. Create UKBottomAnchoredLayout
+- [x] 28. Create UKDataSource
 - [ ] 29. Verify basic rendering
 
 ## Phase B2: Scroll Behavior

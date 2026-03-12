@@ -1,6 +1,6 @@
 # ChatViewportKit
 
-A SwiftUI component for bottom-anchored scrolling content — the kind you see in chat apps, AI conversations, log consoles, and activity feeds.
+A SwiftUI component for bottom-anchored scrolling content. The kind you see in chat apps, AI conversations, log consoles, and activity feeds.
 
 ChatViewportKit solves the hard viewport problems that come with these UIs: content should start at the bottom, new messages should auto-scroll when you're at the bottom but not when you're reading history, prepending older messages shouldn't jump the viewport, and height changes in visible rows shouldn't disturb your reading position. All of this needs to work at 60fps with thousands of rows.
 
@@ -18,7 +18,7 @@ ChatViewportKit handles all of this with a single drop-in view.
 
 ## How It Works
 
-The render engine is a standard SwiftUI `ScrollView` + `LazyVStack` — no `UICollectionView` wrapper, no inverted scroll views, no rotation hacks. Content is bottom-anchored using `.frame(minHeight: viewportHeight, alignment: .bottom)` on the `LazyVStack`, which pushes rows to the bottom when content is shorter than the viewport and grows naturally when it overflows.
+The render engine is a standard SwiftUI `ScrollView` + `LazyVStack` - no `UICollectionView` wrapper, no inverted scroll views, no rotation hacks. Content is bottom-anchored using `.frame(minHeight: viewportHeight, alignment: .bottom)` on the `LazyVStack`, which pushes rows to the bottom when content is shorter than the viewport and grows naturally when it overflows.
 
 A lightweight `UIScrollView` bridge (invisible to consumers) provides direct `contentOffset` access for pixel-precise position correction after prepends. This bridge only reads and writes the scroll offset — it never touches the content, delegate, or layout properties of the underlying scroll view.
 

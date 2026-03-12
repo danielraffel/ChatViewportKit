@@ -16,6 +16,8 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
 
     @State private var viewportHeight: CGFloat = 0
     @State private var scrollProxy: ScrollViewProxy?
+    @State private var previousCount: Int = 0
+    @State private var previousLastID: ID?
 
     public init(
         _ data: Data,
@@ -47,13 +49,26 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                 .onAppear {
                     scrollProxy = proxy
                     viewportHeight = outerProxy.size.height
+                    previousCount = data.count
+                    previousLastID = data.last?[keyPath: idKeyPath]
                     updateControllerIDs()
                 }
                 .onChange(of: outerProxy.size.height) { newHeight in
                     viewportHeight = newHeight
                 }
-                .onChange(of: data.count) { _ in
+                .onChange(of: data.count) { newCount in
+                    let currentLastID = data.last?[keyPath: idKeyPath]
                     updateControllerIDs()
+                    // Auto-scroll to bottom only when items are appended (last ID changed)
+                    // Prepend (first ID changed, last ID same) should not disturb scroll position
+                    let isAppend = newCount > previousCount && currentLastID != previousLastID
+                    if isAppend, let lastID = currentLastID {
+                        withAnimation {
+                            proxy.scrollTo(lastID, anchor: .bottom)
+                        }
+                    }
+                    previousCount = newCount
+                    previousLastID = currentLastID
                 }
                 .onChange(of: controller.pendingCommand) { command in
                     guard let command = command else { return }

@@ -38,6 +38,40 @@ Check this file before starting any work item.
 - This causes incorrect animations and diffing behavior
 - **Solution**: Always use the actual item ID (UUID, etc.) as the ForEach identity, not the array index
 
+## Phase 0 Gate Test Results
+
+All three Phase 0 gate tests pass with basic SwiftUI ScrollView + LazyVStack:
+
+1. **Underfill-to-overflow transition**: Smooth. `.frame(minHeight:, alignment: .bottom)` handles underfill, auto-scroll-to-bottom on append handles overflow. No one-frame snap observed.
+2. **Prepend does not jump**: Passes naturally. SwiftUI preserves scroll position when items are inserted at array index 0, because ForEach uses stable item IDs (UUIDs), not indices. The viewport stays on the same visible items.
+3. **Async height change**: Passes naturally. Both above-viewport and in-viewport height changes do not disturb the reading position. SwiftUI's layout system handles height changes gracefully.
+
+### Key insight
+SwiftUI's ScrollView + LazyVStack with proper item IDs handles all three gate tests WITHOUT any UIScrollView bridge. The bridge (Phase 3) may still be needed for:
+- Pixel-precise anchor restoration when content offset needs sub-point correction
+- Edge cases where SwiftUI's automatic position preservation isn't sufficient under rapid mutations
+- Reading exact scroll offset for bottom-pin detection (preference key approach may suffice)
+
+## UIScrollView Bridge Assessment (for Phase 3)
+
+### What the bridge needs to do
+- Read the current contentOffset for bottom-pin detection
+- Set contentOffset for pixel-precise anchor restoration after data mutations
+- Observe scroll events (didScroll, didEndDecelerating) for mode transitions
+
+### Smallest viable bridge
+- `UIViewRepresentable` that uses `introspect`-style approach to find the hosting UIScrollView
+- OR a transparent `UIViewRepresentable` overlay that captures the UIScrollView reference from the view hierarchy
+- Store the UIScrollView reference weakly in the controller
+- Read/write contentOffset only; never modify contentSize, delegate, or subview hierarchy
+- The SwiftUI ScrollView + LazyVStack remains the ONLY render tree; bridge is observation + correction only
+
+### What the bridge must NOT do
+- Replace or wrap the SwiftUI ScrollView
+- Install a custom UIScrollViewDelegate (would break SwiftUI's internal delegate)
+- Modify contentInset, contentSize, or any layout properties
+- Be exposed in the public API
+
 ## Performance Notes
 
 (Add profiling results and optimization learnings here)

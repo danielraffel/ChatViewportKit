@@ -23,11 +23,11 @@ Goal: Prove hard requirements are achievable with ScrollView + LazyVStack before
 - [x] **0.6** Verify no inversion or rotation hacks are used anywhere
 - [x] **0.7** Verify the view works inside NavigationStack and the top blur remains native
 - [x] **0.8** Implement underfill append animation: filler shrink + row insertion in one animation transaction
-- [ ] **0.9** Verify the underfill-to-overflow transition does not produce a one-frame snap (slowed playback test)
-- [ ] **0.10** Prove append burst of 20 short rows while pinned remains visually continuous
-- [ ] **0.11** Test prepend does not visually jump the viewport
-- [ ] **0.12** Test async height change does not disturb reading position
-- [ ] **0.13** Document the smallest UIScrollView bridge needed for Phase 3
+- [x] **0.9** Verify the underfill-to-overflow transition does not produce a one-frame snap (slowed playback test)
+- [x] **0.10** Prove append burst of 20 short rows while pinned remains visually continuous
+- [x] **0.11** Test prepend does not visually jump the viewport
+- [x] **0.12** Test async height change does not disturb reading position
+- [x] **0.13** Document the smallest UIScrollView bridge needed for Phase 3
 
 ### Phase 0 Exit Gate (ALL must pass):
 - Underfilled append looks smooth transitioning to overflowing

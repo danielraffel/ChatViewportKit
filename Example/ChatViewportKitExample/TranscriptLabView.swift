@@ -40,6 +40,40 @@ struct TranscriptLabView: View {
             }
             .navigationTitle("Transcript Lab")
             .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                // Phase 0 test: async height change
+                // Step 1: Fill 30 messages
+                for i in 0..<30 {
+                    messages.append(LabMessage(text: "Message \(nextIndex)"))
+                    nextIndex += 1
+                }
+                testLog = "Filled 31 msgs"
+
+                // Step 2: Scroll to message 10 after layout
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    let targetID = messages[10].id
+                    controller.scrollTo(id: targetID, anchor: .top, animated: false)
+                    testLog = "Scrolled to msg 10"
+                }
+
+                // Step 3: Async expand message 5 (ABOVE viewport) — should not disturb
+                DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                    withAnimation {
+                        messages[5].extraHeight = 200
+                        messages[5].text += "\n[Expanded to 200pt]"
+                    }
+                    testLog = "Expanded msg 5 (above viewport)"
+                }
+
+                // Step 4: Async expand message 12 (IN viewport) — test stability
+                DispatchQueue.main.asyncAfter(deadline: .now() + 7.0) {
+                    withAnimation {
+                        messages[12].extraHeight = 200
+                        messages[12].text += "\n[Expanded to 200pt]"
+                    }
+                    testLog = "Expanded msg 12 (in viewport)"
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(showDebugHUD ? "Hide HUD" : "Show HUD") {

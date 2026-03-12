@@ -40,12 +40,12 @@
 - [x] 29. Verify basic rendering
 
 ## Phase B2: Scroll Behavior
-- [ ] 30. Bottom-pin detection
-- [ ] 31. Auto-scroll on append
-- [ ] 32. Prepend without jump
-- [ ] 33. scrollTo(id:) via scrollToItem
-- [ ] 34. scrollToTop/Bottom
-- [ ] 35. Verify all commands
+- [x] 30. Bottom-pin detection
+- [x] 31. Auto-scroll on append
+- [x] 32. Prepend without jump
+- [x] 33. scrollTo(id:) via scrollToItem
+- [x] 34. scrollToTop/Bottom
+- [x] 35. Verify all commands
 
 ## Phase B3: Layout & Chrome
 - [ ] 36. Spacing support

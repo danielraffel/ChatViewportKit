@@ -27,7 +27,11 @@ public final class UKChatViewportController<ID: Hashable>: ObservableObject, Cha
     // MARK: - Internal state
 
     /// Reference to the UICollectionView — set by UKChatViewport during setup.
-    internal weak var collectionView: UICollectionView?
+    public internal(set) weak var collectionView: UICollectionView?
+
+    /// Reference to the data source for indexPath lookups.
+    /// Stored here since cv.dataSource is the DiffableDataSource wrapper.
+    internal var dataSourceRef: UKDataSourceBase<ID>?
 
     /// The ID of the topmost visible item.
     public internal(set) var topVisibleItemID: ID?
@@ -35,7 +39,7 @@ public final class UKChatViewportController<ID: Hashable>: ObservableObject, Cha
     /// Distance from the bottom of the scroll content.
     public var distanceFromBottom: CGFloat? {
         guard let cv = collectionView else { return nil }
-        let maxOffset = cv.contentSize.height - cv.bounds.height + cv.contentInset.bottom
+        let maxOffset = cv.contentSize.height - cv.bounds.height + cv.adjustedContentInset.bottom
         return maxOffset - cv.contentOffset.y
     }
 
@@ -51,15 +55,28 @@ public final class UKChatViewportController<ID: Hashable>: ObservableObject, Cha
     /// Content size before a prepend, for offset correction.
     internal var prePrependContentSize: CGFloat = 0
 
+    /// Guards against mode transitions during programmatic scrolling.
+    internal var programmaticScrollInFlight: Bool = false
+
+    /// When true, an auto-scroll to bottom is in flight. Subsequent appends
+    /// during a burst should continue to auto-scroll even if mode briefly
+    /// transitions away from pinned. Mirrors SwiftUI backend's autoScrollPending.
+    internal var autoScrollPending: Bool = false
+
     public init() {}
 
     // MARK: - Public API
 
     public func scrollToBottom(animated: Bool = true) {
         guard let cv = collectionView else { return }
-        let maxOffset = cv.contentSize.height - cv.bounds.height + cv.contentInset.bottom
+        cv.layoutIfNeeded()
+        let maxOffset = cv.contentSize.height - cv.bounds.height + cv.adjustedContentInset.bottom
         if maxOffset > 0 {
+            programmaticScrollInFlight = true
             cv.setContentOffset(CGPoint(x: 0, y: maxOffset), animated: animated)
+            if !animated {
+                programmaticScrollInFlight = false
+            }
         }
         transitionMode(.pinnedToBottom)
     }
@@ -67,15 +84,18 @@ public final class UKChatViewportController<ID: Hashable>: ObservableObject, Cha
     public func scrollToTop(animated: Bool = true) {
         guard let cv = collectionView else { return }
         let topOffset = -cv.adjustedContentInset.top
+        programmaticScrollInFlight = true
         cv.setContentOffset(CGPoint(x: 0, y: topOffset), animated: animated)
+        if !animated {
+            programmaticScrollInFlight = false
+        }
         transitionMode(.freeBrowsing(anchor: nil))
     }
 
     public func scrollTo(id: ID, anchor: UnitPoint = .center, animated: Bool = true) {
         guard let cv = collectionView,
-              let dataSource = cv.dataSource as? UKDataSourceBase<ID> else { return }
-
-        guard let indexPath = dataSource.indexPath(for: id) else { return }
+              let dataSource = dataSourceRef,
+              let indexPath = dataSource.indexPath(for: id) else { return }
 
         // Map UnitPoint to UICollectionView scroll position
         let position: UICollectionView.ScrollPosition
@@ -87,7 +107,11 @@ public final class UKChatViewportController<ID: Hashable>: ObservableObject, Cha
             position = .centeredVertically
         }
 
+        programmaticScrollInFlight = true
         cv.scrollToItem(at: indexPath, at: position, animated: animated)
+        if !animated {
+            programmaticScrollInFlight = false
+        }
         transitionMode(.freeBrowsing(anchor: nil))
     }
 
@@ -112,11 +136,13 @@ public final class UKChatViewportController<ID: Hashable>: ObservableObject, Cha
     // MARK: - Bottom-pin detection (called from scroll delegate)
 
     internal func updateBottomPinState() {
+        // Don't transition during programmatic scrolls
+        guard !programmaticScrollInFlight else { return }
         guard let cv = collectionView else { return }
 
         let contentHeight = cv.contentSize.height
         let viewportHeight = cv.bounds.height
-        let maxOffset = contentHeight - viewportHeight + cv.contentInset.bottom
+        let maxOffset = contentHeight - viewportHeight + cv.adjustedContentInset.bottom
         let actualDistance = maxOffset - cv.contentOffset.y
 
         let isUnderfilled = contentHeight <= viewportHeight

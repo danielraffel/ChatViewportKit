@@ -49,11 +49,15 @@ struct TranscriptLabView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
-                        Button(useLargeTitle ? "Inline" : "Large") {
+                        Button("Nav Title") {
                             useLargeTitle.toggle()
+                            // Scroll to top so the nav bar style change is visible
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                controller.scrollToTop()
+                            }
                         }
                         .foregroundColor(useLargeTitle ? .accentColor : .secondary)
-                        Button(showDebugHUD ? "HUD ✓" : "HUD") {
+                        Button("HUD") {
                             showDebugHUD.toggle()
                         }
                         .foregroundColor(showDebugHUD ? .accentColor : .secondary)

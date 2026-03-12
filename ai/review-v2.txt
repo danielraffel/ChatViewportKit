@@ -1,0 +1,419 @@
+ChatViewportKit Review v2
+
+Bottom line
+
+The current `ai/review.txt` is strong on scroll invariants, but it does not meet the stated requirements as written.
+
+What it gets right:
+- bottom anchoring for underfilled content
+- imperative scroll commands
+- no inverse scrolling
+- explicit state machine thinking
+- reusable framework mindset
+
+What it misses or conflicts with:
+- it explicitly rejects `LazyVStack` as the core rendering model
+- it proposes `UICollectionView` as the primary engine instead of a reusable SwiftUI `ScrollView` component
+- it does not make the `NavigationStack` top blur requirement a concrete acceptance criterion
+- it is closer to a custom transcript engine than a reusable `ScrollView`-style component
+
+Verdict on the current plan
+
+`ai/review.txt` does not fully satisfy the requirements. It is a good backup plan if a SwiftUI-native approach fails, but it should not be the primary v1 plan because `LazyVStack` support is a hard requirement.
+
+Requirement check against `ai/review.txt`
+
+- `Must work with LazyVStack (not just VStack)`: No. The document explicitly says not to build v1 around `LazyVStack`.
+- `First messages must be anchored at bottom from start`: Yes. The underflow-padding approach addresses this.
+- `Must be able to have command to scroll to bottom or top, or to any message by id`: Yes. The controller API covers this.
+- `Must not use inverse scrolling`: Yes. The document forbids inversion.
+- `Must smoothly animate messages coming in from bottom whether it's first message or 100th`: Mostly yes. The custom layout proposal is aimed at this, but it is tied to `UICollectionView`.
+- `Must work with NavigationStack and have the iOS blur at the top effect`: Partially. It should be possible, but the document does not treat this as a testable requirement.
+- `Must be reusable as a ScrollView component, not a one shot hack`: Partially. It is reusable as a framework, but not as a SwiftUI `ScrollView`-style component built around `LazyVStack`.
+
+v2 product decision
+
+The revised plan should be:
+
+- SwiftUI-first on the public surface and in the render tree
+- `ScrollView + LazyVStack` as the default engine
+- no inverse scrolling
+- controller-driven programmatic scrolling similar to `ScrollViewReader`
+- real upright scrolling inside `NavigationStack`
+- reusable as a generic component, not message-screen-specific
+
+UIKit is reserved only for a private precision bridge during Phase 3 anchor correction. It is not the primary rendering engine in v1, and it must not replace the `ScrollView + LazyVStack` render tree.
+
+Primary goal
+
+Build a reusable SwiftUI component that behaves like a bottom-aware chat `ScrollView` while still using `LazyVStack`.
+
+The component must satisfy these hard requirements:
+- use `LazyVStack`, not just `VStack`
+- bottom-anchor initial underfilled content without startup jump
+- expose `scrollToBottom`, `scrollToTop`, and `scrollTo(id:)`
+- avoid inverse transforms
+- animate tail insertions from the bottom in both underfilled and overflowing states
+- preserve native `NavigationStack` top blur behavior
+- be reusable as a generic scrolling component
+
+Recommended public API
+
+```swift
+struct ChatViewport<Data, ID, RowContent>: View
+where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
+    init(
+        _ data: Data,
+        id: KeyPath<Data.Element, ID>,
+        controller: ChatViewportController<ID>,
+        configuration: ChatViewportConfiguration = .init(),
+        @ViewBuilder rowContent: @escaping (Data.Element) -> RowContent
+    )
+}
+
+final class ChatViewportController<ID: Hashable>: ObservableObject {
+    func scrollToBottom(animated: Bool = true)
+    func scrollToTop(animated: Bool = true)
+    func scrollTo(id: ID, anchor: UnitPoint = .center, animated: Bool = true)
+}
+
+struct ChatViewportConfiguration {
+    var spacing: CGFloat = 8
+    var bottomPinThreshold: CGFloat = 24
+    var topLoadTriggerOffset: CGFloat = 80
+    var showsIndicators: Bool = true
+    var animateTailInsertions: Bool = true
+    var preservePositionOnPrepend: Bool = true
+    var preservePositionOnHeightChange: Bool = true
+}
+```
+
+This API keeps the component generic. A "message" is just an item with a stable ID. Separators, unread markers, typing indicators, and loaders should be modeled as ordinary rows.
+
+Core design
+
+1. Scroll host
+
+Use a real SwiftUI `ScrollView` wrapped in `ScrollViewReader`.
+
+Responsibilities:
+- provide the actual scroll surface so `NavigationStack` blur works normally
+- resolve controller commands
+- expose programmatic scrolling without inversion or view rotation
+
+2. Render stack
+
+Render content with an internal `LazyVStack`, never `VStack`-only.
+
+Responsibilities:
+- support large transcripts efficiently
+- preserve natural SwiftUI layout behavior
+- keep row authoring fully SwiftUI-native
+
+3. Underflow bottom anchoring
+
+When content is shorter than the viewport, push the transcript down from the top instead of performing an initial scroll.
+
+Implementation direction:
+- measure viewport height
+- measure rendered content height only while the transcript is underfilled
+- compute `topFill = max(0, viewportHeight - contentHeight)`
+- insert a top filler view or equivalent min-height alignment mechanism so the first messages start at the bottom on first render
+
+This must be part of layout, not a delayed "scroll to bottom on appear" hack.
+
+Underfill append animation must be explicit, not implied:
+- model the top filler as a real animatable height
+- append the new row and shrink the filler in the same animation transaction
+- apply a bottom-origin transition to the inserted row
+- when the filler reaches zero, transition into the overflowing regime without a one-frame snap
+
+Recommended insertion transition while pinned:
+- row transition: `.move(edge: .bottom).combined(with: .opacity)`
+- filler adjustment: animate `topFill` in the same `withAnimation` block as the data append
+
+Measurement regime:
+- when the transcript is underfilled, all rows are visible by definition, so measuring rendered content height is reliable
+- once the transcript overflows, stop depending on total content height for correctness
+- after overflow begins, rely on visible-row frames, bottom distance, and anchor restoration instead of global stack height
+
+4. Viewport observation
+
+Track enough geometry to make scrolling deterministic.
+
+State to capture:
+- viewport height
+- underfilled content height only
+- item frames for visible items
+- first visible ID
+- last visible ID
+- distance from bottom
+- whether the viewport is currently pinned to bottom
+
+Preferred implementation:
+- SwiftUI preference keys for item frames and content size
+- lightweight internal state object that converts geometry into scroll decisions
+
+5. Scroll command coordinator
+
+The controller should queue commands and resolve them against the active `ScrollViewReader`.
+
+Supported commands:
+- scroll to top
+- scroll to bottom
+- scroll to specific ID
+- restore anchor after prepend or height change
+
+The coordinator should own command sequencing so multiple updates in one run loop do not fight each other.
+
+6. Internal offset bridge
+
+Phase 3 should plan on a private bridge to the underlying `UIScrollView` for exact pixel correction during prepend and self-sizing changes.
+
+Rules:
+- keep the render tree as `ScrollView + LazyVStack`
+- do not replace the engine with `UICollectionView` in v1
+- do not expose UIKit to API consumers
+- only use the bridge for final offset correction after layout has settled
+
+This keeps `LazyVStack` as a real requirement rather than a marketing wrapper while still acknowledging that `ScrollViewReader` alone is not enough for pixel-precise anchor restoration.
+
+7. Append animation model
+
+Tail insertions should behave differently depending on whether the viewport is pinned to bottom.
+
+If pinned to bottom:
+- insert with a bottom-origin transition and maintain bottom pin in the same update cycle
+- animate cleanly when content is still underfilling the viewport
+- animate cleanly when content has already overflowed
+
+If not pinned to bottom:
+- do not move the current reading position
+- append off-screen
+- expose a "jump to latest" affordance as a higher-level concern outside the core component
+
+8. NavigationStack and top blur
+
+The component must live inside a real `NavigationStack` with a normal upright scroll surface so the top blur effect remains native.
+
+Rules:
+- no rotation transforms
+- no flipped coordinate system
+- no fake overlay that blocks native bar behavior
+- test both large-title and inline-title navigation states
+
+9. Reusability constraint
+
+This should be a generic component, not a chat-screen one-off.
+
+It must:
+- work for any stable-ID row collection
+- not assume bubbles, avatars, or a composer
+- keep keyboard/composer logic optional and layered on top
+- be packageable as a Swift package module
+
+State machine
+
+Use an explicit viewport mode so updates are predictable.
+
+```swift
+enum ViewportMode<ID: Hashable> {
+    case initialBottomAnchored
+    case pinnedToBottom
+    case freeBrowsing(anchor: AnchorSnapshot<ID>)
+    case programmaticScroll(target: ScrollTarget<ID>)
+    case correctingAfterDataChange(anchor: AnchorSnapshot<ID>)
+}
+
+struct AnchorSnapshot<ID: Hashable> {
+    let id: ID
+    let distanceFromViewportTop: CGFloat
+    let distanceFromBottom: CGFloat
+}
+```
+
+Mode transitions
+
+- `initialBottomAnchored` + first stable layout -> `pinnedToBottom`
+- `pinnedToBottom` + user scrolls above threshold -> `freeBrowsing(anchor:)`
+- `freeBrowsing(anchor:)` + user scrolls back within bottom threshold -> `pinnedToBottom`
+- any mode + controller scroll command -> `programmaticScroll(target:)`
+- `programmaticScroll(target:)` + command settles at bottom -> `pinnedToBottom`
+- `programmaticScroll(target:)` + command settles away from bottom -> `freeBrowsing(anchor:)`
+- `pinnedToBottom` + prepend or visible height change -> `correctingAfterDataChange(anchor:)`, then back to `pinnedToBottom`
+- `freeBrowsing(anchor:)` + prepend or visible height change -> `correctingAfterDataChange(anchor:)`, then back to `freeBrowsing(anchor:)`
+- any mode + hard reset of the data source -> `initialBottomAnchored` unless the host explicitly requests a programmatic target
+
+Update policy
+
+Every data or geometry change should flow through the same pipeline:
+
+1. Classify the update: append, prepend, mutate, reset, bounds change, keyboard/composer change.
+2. Capture the current anchor snapshot.
+3. Apply the data update.
+4. Let layout settle.
+5. Restore the correct anchor:
+   - preserve bottom distance if pinned to bottom
+   - preserve the top visible anchor if free browsing
+6. Run any tail insertion animation if appropriate.
+7. Recompute `ViewportMode`.
+
+This avoids ad hoc fixes for each special case.
+
+Phased work plan
+
+Phase 0: Feasibility spike
+
+Goal:
+- prove that the hard requirements are achievable with `ScrollView + LazyVStack`
+
+Work items:
+- create a small "Transcript Lab" test screen
+- implement a minimal `ChatViewport` shell with `ScrollViewReader`, `ScrollView`, and `LazyVStack`
+- prove bottom anchoring from first render with 1, 3, and 10 short rows
+- prove `scrollToBottom`, `scrollToTop`, and `scrollTo(id:)`
+- verify no inversion is used anywhere
+- verify the view works inside `NavigationStack` and the top blur remains native
+- implement and record the exact underfill append animation strategy: filler shrink + row insertion in one transaction
+- verify the underfill-to-overflow transition does not snap
+- decide the exact scope of the internal offset bridge for Phase 3
+
+Exit criteria:
+- all seven hard requirements are demonstrably achievable in a spike
+- append burst of 20 short rows while pinned remains visually continuous with no visible jump in normal playback
+- the row that crosses the underfill-to-overflow threshold does not produce a one-frame snap when reviewed in slowed playback
+- `scrollToBottom`, `scrollToTop`, and `scrollTo(id:)` land correctly in repeated runs
+- the smallest internal `UIScrollView` bridge needed for Phase 3 is documented without abandoning `LazyVStack`
+
+Phase 1: Reusable component skeleton
+
+Goal:
+- ship the generic API and core bottom-aware layout behavior
+
+Work items:
+- implement `ChatViewport`
+- implement `ChatViewportController`
+- implement `ChatViewportConfiguration`
+- add geometry capture for viewport height, underfilled content height, and visible rows
+- implement underflow bottom anchoring without startup jump
+- wire `scrollToBottom`, `scrollToTop`, and `scrollTo(id:)`
+- add a demo using generic rows rather than message-specific views
+
+Exit criteria:
+- reusable component exists
+- initial content is bottom-anchored
+- all programmatic scroll commands work against stable IDs
+
+Phase 2: Bottom pin and append animation
+
+Goal:
+- make new tail content feel correct in both underfilled and overflowing states
+
+Work items:
+- detect pinned-to-bottom state using a threshold
+- distinguish pinned-bottom behavior from free-browsing behavior
+- implement bottom-origin insertion animation when pinned
+- ensure appending while free-browsing does not move the viewport
+- expose enough state for a host app to show "jump to latest" UI
+- test transition from underfilled transcript to overflowing transcript
+
+Exit criteria:
+- first message and hundredth message both animate in from the bottom when pinned
+- free browsing remains stable during append
+
+Phase 3: Position preservation during prepend and height changes
+
+Goal:
+- keep history stable when older content is inserted or visible rows change height
+
+Work items:
+- implement `AnchorSnapshot`
+- preserve the top visible anchor during prepend
+- preserve bottom distance while pinned
+- handle async image loads or edited rows that expand in height
+- use the planned private offset bridge for exact correction after layout settles
+- add regression cases for prepend, height expansion, and dynamic type change
+
+Exit criteria:
+- no visible jump when prepending
+- no visible jump when visible row heights change
+
+Phase 4: Navigation, keyboard, accessibility
+
+Goal:
+- make the component production-safe inside a typical chat screen
+
+Work items:
+- verify behavior inside `NavigationStack` with large and inline titles
+- keep the native top blur behavior intact
+- integrate optional keyboard/composer behavior as a layered feature
+- test multiline composer growth without breaking bottom pin
+- add accessibility notifications for major programmatic scroll moves
+- test dynamic type and right-to-left layout
+
+Exit criteria:
+- navigation chrome still feels native
+- keyboard/composer changes do not break bottom anchoring
+- accessibility behavior is acceptable for VoiceOver users
+
+Phase 5: Packaging, performance, documentation
+
+Goal:
+- make the component reusable outside the demo app
+
+Work items:
+- package as Swift Package
+- separate core component from demo/support code
+- add usage documentation and integration examples
+- add stress tests for large transcripts
+- add performance instrumentation for append/prepend scenarios
+- document known limitations and fallback behavior
+
+Exit criteria:
+- component is shippable as a package
+- consumers can adopt it without transcript-specific hacks
+
+Transcript Lab requirements
+
+The demo should include controls for:
+- 1, 5, 50, and 5,000 rows
+- append one row
+- append burst
+- prepend older rows
+- jump to latest
+- jump to arbitrary ID
+- expand an existing row to 5x height
+- async height growth
+- `NavigationStack` large-title and inline-title modes
+- optional keyboard/composer demo
+
+The demo should surface:
+- current viewport mode
+- pinned-to-bottom state
+- first and last visible IDs
+- distance from bottom
+- last anchor snapshot used for correction
+
+Definition of done
+
+The product is ready when these statements are true:
+
+- `LazyVStack` is the actual render stack, not just a supported variant.
+- The first visible content starts at the bottom without an initial jump.
+- The component exposes deterministic `scrollToBottom`, `scrollToTop`, and `scrollTo(id:)`.
+- No inverse scrolling or rotation hacks are used.
+- Tail insertions animate from the bottom when the viewport is pinned, whether content underfills or overflows.
+- The component works inside `NavigationStack` and preserves the native top blur behavior.
+- The component is generic and reusable as a SwiftUI scrolling primitive.
+- Prepending and self-sizing row changes do not visibly jump the viewport.
+
+Recommendation
+
+Keep the good parts of `ai/review.txt`, especially the invariant-driven mindset, the state machine, and the demo-first validation strategy. Replace the primary architecture decision.
+
+The correct v1 plan is:
+- `ScrollView + LazyVStack` first
+- reusable SwiftUI API first
+- a private `UIScrollView` precision bridge planned for Phase 3 anchor correction without replacing the SwiftUI render tree
+
+That is the narrowest plan that still matches the requirements you listed.

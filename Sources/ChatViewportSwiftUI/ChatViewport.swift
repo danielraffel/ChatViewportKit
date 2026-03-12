@@ -1,4 +1,5 @@
 import SwiftUI
+import ChatViewportCore
 
 /// A bottom-anchored viewport for displaying scrollable content with chat-like behavior.
 ///

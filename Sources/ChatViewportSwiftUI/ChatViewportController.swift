@@ -1,8 +1,9 @@
 import SwiftUI
 import UIKit
+import ChatViewportCore
 
 /// Controller for imperative scroll commands and viewport state on a `ChatViewport`.
-public final class ChatViewportController<ID: Hashable>: ObservableObject {
+public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatViewportControllerProtocol, ChatViewportDiagnostics {
 
     // MARK: - Published state
 

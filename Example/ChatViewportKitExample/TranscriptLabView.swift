@@ -52,9 +52,11 @@ struct TranscriptLabView: View {
                         Button(useLargeTitle ? "Inline" : "Large") {
                             useLargeTitle.toggle()
                         }
-                        Button(showDebugHUD ? "HUD" : "HUD") {
+                        .foregroundColor(useLargeTitle ? .accentColor : .secondary)
+                        Button(showDebugHUD ? "HUD ✓" : "HUD") {
                             showDebugHUD.toggle()
                         }
+                        .foregroundColor(showDebugHUD ? .accentColor : .secondary)
                     }
                     .font(.caption)
                 }

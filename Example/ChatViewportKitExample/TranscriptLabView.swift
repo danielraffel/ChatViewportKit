@@ -155,6 +155,18 @@ struct TranscriptLabView: View {
         .padding(.horizontal)
         .padding(.vertical, 6)
         .background(Color(.systemBackground))
+        .gesture(
+            DragGesture(minimumDistance: 10, coordinateSpace: .local)
+                .onEnded { value in
+                    // Swipe down on composer dismisses keyboard
+                    if value.translation.height > 20 {
+                        UIApplication.shared.sendAction(
+                            #selector(UIResponder.resignFirstResponder),
+                            to: nil, from: nil, for: nil
+                        )
+                    }
+                }
+        )
     }
 
     // MARK: - Controls

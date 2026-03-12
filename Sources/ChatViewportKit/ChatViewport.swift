@@ -111,7 +111,15 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                     previousCount = data.count
                 }
                 .onChange(of: outerProxy.size.height) { newHeight in
+                    let heightChanged = newHeight != viewportHeight
                     viewportHeight = newHeight
+                    // When viewport resizes (keyboard show/hide) while pinned,
+                    // auto-scroll to keep the bottom content in view.
+                    if heightChanged && controller.isPinnedToBottom {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            controller.scrollToBottom(animated: false)
+                        }
+                    }
                 }
                 .onChange(of: data.count) { newCount in
                     // NOTE: do NOT read `data` here — it may be stale.

@@ -18,9 +18,9 @@ Goal: Prove hard requirements are achievable with ScrollView + LazyVStack before
 - [x] **0.1** Create Swift Package structure: `ChatViewportKit` (core), `ChatViewportKitExample` (demo app)
 - [x] **0.2** Create minimal "Transcript Lab" test screen inside the example app
 - [x] **0.3** Implement minimal ChatViewport shell: ScrollViewReader + ScrollView + LazyVStack
-- [ ] **0.4** Prove bottom anchoring from first render with 1, 3, and 10 short rows — no startup jump
-- [ ] **0.5** Prove `scrollToBottom`, `scrollToTop`, and `scrollTo(id:)` land correctly in repeated runs
-- [ ] **0.6** Verify no inversion or rotation hacks are used anywhere
+- [x] **0.4** Prove bottom anchoring from first render with 1, 3, and 10 short rows — no startup jump
+- [x] **0.5** Prove `scrollToBottom`, `scrollToTop`, and `scrollTo(id:)` land correctly in repeated runs
+- [x] **0.6** Verify no inversion or rotation hacks are used anywhere
 - [ ] **0.7** Verify the view works inside NavigationStack and the top blur remains native
 - [ ] **0.8** Implement underfill append animation: filler shrink + row insertion in one animation transaction
 - [ ] **0.9** Verify the underfill-to-overflow transition does not produce a one-frame snap (slowed playback test)

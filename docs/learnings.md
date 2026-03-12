@@ -23,6 +23,13 @@ Check this file before starting any work item.
 - When content < viewport, alignment pushes rows to bottom; when content > viewport, the frame grows naturally
 - This avoids the chicken-and-egg problem because the rows are always within the visible frame
 
+### ForEach with wrapper structs breaks ScrollViewReader.scrollTo
+- Using `ForEach(dataElements, id: \.id)` where `dataElements` is a computed property returning wrapper structs BREAKS `ScrollViewReader.scrollTo`
+- The proxy.scrollTo call executes but has no visible effect — the scroll doesn't happen
+- **Solution**: Use `ForEach(items.indices, id: \.self)` with direct `.id(itemID)` on the content view
+- This keeps the `.id()` modifier on the actual row view, which ScrollViewReader can find
+- Raw SwiftUI `ForEach(messages) { msg in ... .id(msg.id) }` also works — the issue is specifically with intermediate wrapper types in the ForEach data source
+
 ## Performance Notes
 
 (Add profiling results and optimization learnings here)

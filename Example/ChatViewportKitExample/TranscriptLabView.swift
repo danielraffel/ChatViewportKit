@@ -19,25 +19,23 @@ struct LabMessage: Identifiable {
 
 struct TranscriptLabView: View {
     @StateObject private var controller = ChatViewportController<UUID>()
-    @State private var messages: [LabMessage] = []
-    @State private var nextIndex = 1
+    @State private var messages: [LabMessage] = (1...3).map { LabMessage(text: "Message \($0)") }
+    @State private var nextIndex = 4
     @State private var prependCounter = 0
     @State private var showDebugHUD = true
+    @State private var testLog: String = ""
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Debug HUD
                 if showDebugHUD {
                     debugHUD
                 }
 
-                // Chat viewport
                 ChatViewport(messages, controller: controller) { message in
                     messageRow(message)
                 }
 
-                // Controls
                 controlBar
             }
             .navigationTitle("Transcript Lab")
@@ -74,6 +72,9 @@ struct TranscriptLabView: View {
             Text("Messages: \(messages.count)")
             Text("First ID: \(messages.first?.id.uuidString.prefix(8) ?? "—")")
             Text("Last ID: \(messages.last?.id.uuidString.prefix(8) ?? "—")")
+            if !testLog.isEmpty {
+                Text(testLog).foregroundColor(.green)
+            }
         }
         .font(.system(.caption2, design: .monospaced))
         .padding(8)
@@ -85,7 +86,6 @@ struct TranscriptLabView: View {
 
     private var controlBar: some View {
         VStack(spacing: 4) {
-            // Row 1: Add messages
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     Group {
@@ -101,20 +101,16 @@ struct TranscriptLabView: View {
                 .padding(.horizontal)
             }
 
-            // Row 2: Navigation & manipulation
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
                     Group {
                         Button("Prepend 5") { prependMessages(5) }
                         Button("⬇ Bottom") { controller.scrollToBottom() }
                         Button("⬆ Top") { controller.scrollToTop() }
+                        Button("→ Mid") { scrollToMiddle() }
                         Button("Expand Last") { expandLastMessage() }
                         Button("Async Grow") { asyncGrowRandomMessage() }
-                        Button("Clear") {
-                            messages.removeAll()
-                            nextIndex = 1
-                            prependCounter = 0
-                        }
+                        Button("Clear") { resetWith(count: 0) }
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -138,7 +134,6 @@ struct TranscriptLabView: View {
     }
 
     private func burstAppend(_ count: Int) {
-        // Simulate rapid message arrival
         for i in 0..<count {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
                 withAnimation {
@@ -160,6 +155,23 @@ struct TranscriptLabView: View {
         }
     }
 
+    private func scrollToMiddle() {
+        guard messages.count >= 3 else { return }
+        let midIndex = messages.count / 2
+        controller.scrollTo(id: messages[midIndex].id)
+    }
+
+    private func resetWith(count: Int) {
+        messages.removeAll()
+        prependCounter = 0
+        if count > 0 {
+            messages = (1...count).map { LabMessage(text: "Message \($0)") }
+            nextIndex = count + 1
+        } else {
+            nextIndex = 1
+        }
+    }
+
     private func expandLastMessage() {
         guard !messages.isEmpty else { return }
         withAnimation {
@@ -171,7 +183,6 @@ struct TranscriptLabView: View {
     private func asyncGrowRandomMessage() {
         guard !messages.isEmpty else { return }
         let index = Int.random(in: 0..<messages.count)
-        // Simulate async content load (e.g., image finishing)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             withAnimation {
                 messages[index].extraHeight = 150

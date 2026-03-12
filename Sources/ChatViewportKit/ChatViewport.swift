@@ -15,6 +15,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     private let configuration: ChatViewportConfiguration
 
     @State private var viewportHeight: CGFloat = 0
+    @State private var scrollProxy: ScrollViewProxy?
 
     public init(
         _ data: Data,
@@ -32,18 +33,21 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
 
     public var body: some View {
         GeometryReader { outerProxy in
-            ScrollViewReader { scrollProxy in
+            ScrollViewReader { proxy in
                 ScrollView(showsIndicators: configuration.showsIndicators) {
                     LazyVStack(spacing: configuration.spacing) {
-                        ForEach(dataElements, id: \.id) { element in
-                            rowContent(element.item)
-                                .id(element.id)
+                        let items = Array(data)
+                        ForEach(items.indices, id: \.self) { index in
+                            let item = items[index]
+                            let itemID = item[keyPath: idKeyPath]
+                            rowContent(item)
+                                .id(itemID)
                         }
                     }
                     .frame(minHeight: outerProxy.size.height, alignment: .bottom)
                 }
                 .onAppear {
-                    controller.scrollProxy = scrollProxy
+                    scrollProxy = proxy
                     viewportHeight = outerProxy.size.height
                     updateControllerIDs()
                 }
@@ -53,26 +57,35 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                 .onChange(of: data.count) { _ in
                     updateControllerIDs()
                 }
+                .onChange(of: controller.pendingCommand) { command in
+                    guard let command = command else { return }
+                    executeCommand(command, proxy: proxy)
+                    DispatchQueue.main.async {
+                        controller.pendingCommand = nil
+                    }
+                }
             }
         }
     }
 
     // MARK: - Internal helpers
 
+    private func executeCommand(_ command: ScrollCommand<ID>, proxy: ScrollViewProxy) {
+        switch command {
+        case let .scrollTo(id, anchor, animated):
+            if animated {
+                withAnimation {
+                    proxy.scrollTo(id, anchor: anchor)
+                }
+            } else {
+                proxy.scrollTo(id, anchor: anchor)
+            }
+        }
+    }
+
     private func updateControllerIDs() {
         controller.firstItemID = data.first?[keyPath: idKeyPath]
         controller.lastItemID = data.last?[keyPath: idKeyPath]
-    }
-
-    // MARK: - Data mapping
-
-    private var dataElements: [IdentifiedElement] {
-        data.map { IdentifiedElement(id: $0[keyPath: idKeyPath], item: $0) }
-    }
-
-    private struct IdentifiedElement: Identifiable {
-        let id: ID
-        let item: Data.Element
     }
 }
 

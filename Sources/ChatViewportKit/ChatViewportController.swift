@@ -142,12 +142,14 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
     }
 
     public func scrollToTop(animated: Bool = true) {
-        // Prefer UIScrollView bridge — sets offset to exactly zero,
-        // which is required for NavigationStack large title to expand.
+        // Use UIScrollView bridge with adjustedContentInset so we scroll
+        // past the navigation bar to the true top. This also triggers
+        // NavigationStack large title expansion.
         if let scrollView = scrollViewRef {
             DispatchQueue.main.async { [weak scrollView] in
                 guard let scrollView = scrollView else { return }
-                scrollView.setContentOffset(.zero, animated: animated)
+                let topOffset = -scrollView.adjustedContentInset.top
+                scrollView.setContentOffset(CGPoint(x: 0, y: topOffset), animated: animated)
             }
         } else if let id = firstItemID {
             issueCommand(.scrollTo(id: id, anchor: .top, animated: animated))
@@ -155,11 +157,12 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
         transitionMode(.freeBrowsing(anchor: nil))
     }
 
-    /// Scroll to absolute top (offset zero) without animation.
-    /// Forces the NavigationStack large title to expand immediately.
+    /// Scroll to absolute top without animation.
+    /// Accounts for navigation bar inset and forces large title expansion.
     public func scrollToAbsoluteTop() {
         if let scrollView = scrollViewRef {
-            scrollView.setContentOffset(.zero, animated: false)
+            let topOffset = -scrollView.adjustedContentInset.top
+            scrollView.setContentOffset(CGPoint(x: 0, y: topOffset), animated: false)
         } else if let id = firstItemID {
             issueCommand(.scrollTo(id: id, anchor: .top, animated: false))
         }

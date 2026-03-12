@@ -39,6 +39,15 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
     /// This preserves the pre-change anchor during a data mutation.
     internal var freezeAnchor: Bool = false
 
+    /// Captures pinned state at body-evaluation time, before preference changes
+    /// can transition the mode away from pinned during the same layout pass.
+    public internal(set) var wasPinnedBeforeCountChange: Bool = false
+
+    /// When true, an auto-scroll to bottom is in progress. Subsequent appends
+    /// during a burst should continue to auto-scroll even if mode briefly
+    /// transitions away from pinned during SwiftUI's layout pass.
+    internal var autoScrollPending: Bool = false
+
     /// Weak reference to the hosting UIScrollView for direct contentOffset manipulation.
     /// Set by ScrollViewBridge; used for pixel-precise prepend offset correction.
     internal weak var scrollViewRef: UIScrollView?
@@ -48,6 +57,14 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
 
     /// Whether the anchor is currently frozen (for debugging).
     public var freezeAnchorState: Bool { freezeAnchor }
+
+    /// Debug: distance from the bottom of the scroll view content.
+    /// Returns nil if the scroll view bridge isn't established.
+    public var distanceFromBottom: CGFloat? {
+        guard let sv = scrollViewRef else { return nil }
+        let maxOffset = sv.contentSize.height - sv.bounds.height + sv.contentInset.bottom
+        return maxOffset - sv.contentOffset.y
+    }
 
     /// Callback when pinned-to-bottom state changes (for host "jump to latest" UI).
     public var onBottomPinnedChanged: ((Bool) -> Void)?
@@ -63,9 +80,75 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
     // MARK: - Public API
 
     public func scrollToBottom(animated: Bool = true) {
-        guard let id = lastItemID else { return }
-        issueCommand(.scrollTo(id: id, anchor: .bottom, animated: animated))
+        // Prefer UIScrollView bridge for reliability — proxy.scrollTo can fail
+        // when the target is far from the current render window in LazyVStack.
+        if let scrollView = scrollViewRef {
+            DispatchQueue.main.async { [weak scrollView] in
+                guard let scrollView = scrollView else { return }
+                scrollView.layoutIfNeeded()
+                let bottomOffset = scrollView.contentSize.height - scrollView.bounds.height + scrollView.contentInset.bottom
+                if bottomOffset > 0 {
+                    scrollView.setContentOffset(
+                        CGPoint(x: 0, y: bottomOffset),
+                        animated: animated
+                    )
+                }
+            }
+        } else if let id = lastItemID {
+            issueCommand(.scrollTo(id: id, anchor: .bottom, animated: animated))
+        }
         transitionMode(.pinnedToBottom)
+    }
+
+    /// Scroll to bottom with retry — ensures we reach the true bottom even when
+    /// SwiftUI's layout is still settling (large batch appends, animations).
+    internal func scrollToBottomWithRetry(maxAttempts: Int = 5, attemptInterval: TimeInterval = 0.15, completion: (() -> Void)? = nil) {
+        guard let scrollView = scrollViewRef else {
+            // No bridge — fall back to single-shot proxy scroll
+            if let id = lastItemID {
+                issueCommand(.scrollTo(id: id, anchor: .bottom, animated: true))
+            }
+            transitionMode(.pinnedToBottom)
+            completion?()
+            return
+        }
+
+        var attempt = 0
+        func tryScroll() {
+            guard attempt < maxAttempts else {
+                completion?()
+                return
+            }
+            attempt += 1
+            DispatchQueue.main.async { [weak scrollView, weak self] in
+                guard let scrollView = scrollView, let self = self else {
+                    completion?()
+                    return
+                }
+                scrollView.layoutIfNeeded()
+                let bottomOffset = scrollView.contentSize.height - scrollView.bounds.height + scrollView.contentInset.bottom
+                let currentOffset = scrollView.contentOffset.y
+                let distanceFromBottom = bottomOffset - currentOffset
+
+                if bottomOffset > 0 {
+                    scrollView.setContentOffset(
+                        CGPoint(x: 0, y: bottomOffset),
+                        animated: attempt == 1 // animate first attempt, snap subsequent
+                    )
+                }
+                self.transitionMode(.pinnedToBottom)
+
+                // If we're still far from bottom, layout may not be done — retry
+                if distanceFromBottom > 50 && attempt < maxAttempts {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + attemptInterval) {
+                        tryScroll()
+                    }
+                } else {
+                    completion?()
+                }
+            }
+        }
+        tryScroll()
     }
 
     public func scrollToTop(animated: Bool = true) {

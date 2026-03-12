@@ -37,9 +37,16 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     public var body: some View {
         // Update controller IDs during body evaluation where data is always fresh.
         // onChange closures capture stale data references, so we cannot read data there.
+        // Also capture pinned state BEFORE preferences fire — large appends cause
+        // ScrollOffsetPreference to transition mode to freeBrowsing before onChange runs.
         let _ = {
             controller.firstItemID = data.first?[keyPath: idKeyPath]
             controller.lastItemID = data.last?[keyPath: idKeyPath]
+            if data.count != previousCount {
+                // If an auto-scroll is already in flight (burst append), preserve intent.
+                // Otherwise capture the actual pinned state before preferences fire.
+                controller.wasPinnedBeforeCountChange = controller.isPinnedToBottom || controller.autoScrollPending
+            }
         }()
 
         GeometryReader { outerProxy in
@@ -147,10 +154,15 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                             proxy.scrollTo(anchorID, anchor: .top)
                             controller.freezeAnchor = false
                         }
-                    } else if isAppend && controller.isPinnedToBottom,
-                              let lastID = controller.lastItemID {
-                        withAnimation {
-                            proxy.scrollTo(lastID, anchor: .bottom)
+                    } else if isAppend && controller.wasPinnedBeforeCountChange {
+                        // Auto-scroll to bottom after append when user was pinned.
+                        // Mark intent so burst appends continue to auto-scroll even
+                        // when mode briefly flips to freeBrowsing during layout.
+                        controller.autoScrollPending = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            controller.scrollToBottomWithRetry {
+                                controller.autoScrollPending = false
+                            }
                         }
                         UIAccessibility.post(notification: .pageScrolled, argument: nil)
                     }

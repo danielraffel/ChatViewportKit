@@ -134,7 +134,7 @@ This freezes the scroll anchor so the viewport stays on the same content while n
 ```swift
 ChatViewportConfiguration(
     spacing: 8,                // Space between rows (default: 8)
-    bottomPinThreshold: 24,    // Distance from bottom to count as "pinned" (default: 24)
+    bottomPinThreshold: 50,    // Distance from bottom to count as "pinned" (default: 50)
     topLoadTriggerOffset: 80,  // Distance from top to trigger load-more (default: 80)
     showsIndicators: true      // Show scroll indicators (default: true)
 )
@@ -211,8 +211,8 @@ All operations are well under the 16.67ms frame budget for 60fps. `LazyVStack` r
 ## Known Limitations
 
 - **`prepareToPrepend()` is required before prepends.** The framework can't distinguish a prepend from other mutations without this signal.
-- **The UIScrollView bridge is private.** It traverses the view hierarchy to find the hosting UIScrollView. This works on iOS 16–18 but could break if Apple changes SwiftUI internals. The bridge is only used for prepend offset correction.
-- **`scrollTo(id:)` has range limits.** SwiftUI's `ScrollViewReader` can fail for items far from the current render window in a `LazyVStack`. Works reliably within ~15–20 positions of the current viewport.
+- **The UIScrollView bridge is private.** It traverses the view hierarchy to find the hosting UIScrollView. This works on iOS 16–18 but could break if Apple changes SwiftUI internals. The bridge is used for prepend offset correction, reliable scroll-to-bottom (at any distance), and auto-scroll on append.
+- **`scrollTo(id:)` has range limits.** SwiftUI's `ScrollViewReader` can fail for items far from the current render window in a `LazyVStack`. `scrollToBottom()` and `scrollToTop()` use the UIScrollView bridge and work reliably at any distance; `scrollTo(id:)` for arbitrary IDs is limited to ~15–20 positions from the current viewport.
 - **Data must have stable IDs.** Use UUIDs or other stable identifiers — not array indices.
 - **iOS 16+ only.**
 - **No built-in keyboard handling.** By design — compose the viewport with your own composer view in a `VStack`, and SwiftUI handles the rest.

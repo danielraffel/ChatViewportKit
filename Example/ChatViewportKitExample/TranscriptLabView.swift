@@ -45,7 +45,7 @@ struct TranscriptLabView: View {
             }
             .navigationTitle("Transcript Lab")
             .navigationBarTitleDisplayMode(useLargeTitle ? .large : .inline)
-            // .onAppear { runStressTest() } // Uncomment for automated tests
+            // .onAppear { runAutoScrollTest() } // Uncomment for automated tests
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
@@ -214,10 +214,11 @@ struct TranscriptLabView: View {
                     messages.append(LabMessage(text: "Burst \(nextIndex)"))
                     nextIndex += 1
                 }
-                DispatchQueue.main.async {
-                    controller.scrollToBottom()
-                }
             }
+        }
+        // Single scroll after the last burst item arrives
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(count) * 0.05 + 0.1) {
+            controller.scrollToBottom()
         }
     }
 
@@ -532,6 +533,44 @@ struct TranscriptLabView: View {
                 testLog = "Done! Pin:\(controller.isPinnedToBottom ? "Y" : "N")"
                 NSLog("[SMOOTH] ALL SMOOTH TESTS COMPLETE")
             }
+        }
+    }
+
+    private func runAutoScrollTest() {
+        NSLog("[TEST] Starting comprehensive auto-scroll test")
+
+        // Test sequence: +1, +10, +50, +5000
+        // Each test appends, waits for scroll, checks distance from bottom
+        let tests: [(String, Int)] = [
+            ("+1", 1), ("+10", 10), ("+50", 50), ("+5K", 5000)
+        ]
+        var results: [String] = []
+        var delay: TimeInterval = 1.0 // initial delay for bridge setup
+
+        for (label, count) in tests {
+            let capturedLabel = label
+            let capturedCount = count
+            let checkDelay: TimeInterval = capturedCount > 1000 ? 2.0 : 1.0
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                NSLog("[TEST] \(capturedLabel): appending \(capturedCount) msgs, mode=\(controller.mode) pin=\(controller.isPinnedToBottom)")
+                withAnimation {
+                    for _ in 0..<capturedCount {
+                        messages.append(LabMessage(text: "Message \(nextIndex)"))
+                        nextIndex += 1
+                    }
+                }
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + checkDelay) {
+                    let dist = controller.distanceFromBottom ?? -1
+                    let pass = dist >= 0 && dist <= 50
+                    let result = "\(capturedLabel):\(pass ? "OK" : "FAIL(\(Int(dist)))")"
+                    results.append(result)
+                    NSLog("[TEST] \(capturedLabel) RESULT: dist=\(Int(dist)) \(pass ? "PASS" : "FAIL") total=\(messages.count)")
+                    testLog = results.joined(separator: " ")
+                }
+            }
+            delay += checkDelay + 0.5 // time for append + check + buffer
         }
     }
 

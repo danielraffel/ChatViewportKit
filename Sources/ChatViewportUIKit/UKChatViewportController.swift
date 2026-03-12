@@ -116,7 +116,6 @@ public final class UKChatViewportController<ID: Hashable>: ObservableObject, Cha
 
         let contentHeight = cv.contentSize.height
         let viewportHeight = cv.bounds.height
-        let distanceFromBottom = contentHeight + cv.contentOffset.y + cv.contentInset.bottom - contentHeight
         let maxOffset = contentHeight - viewportHeight + cv.contentInset.bottom
         let actualDistance = maxOffset - cv.contentOffset.y
 

@@ -37,7 +37,7 @@
 - [x] 26. Create UKHostingCell
 - [x] 27. Create UKBottomAnchoredLayout
 - [x] 28. Create UKDataSource
-- [ ] 29. Verify basic rendering
+- [x] 29. Verify basic rendering
 
 ## Phase B2: Scroll Behavior
 - [ ] 30. Bottom-pin detection

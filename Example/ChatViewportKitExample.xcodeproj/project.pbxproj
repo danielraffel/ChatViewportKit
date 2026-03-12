@@ -10,6 +10,8 @@
 		AB7B8D8176CBE94FC91DF37B /* ChatViewportKit in Frameworks */ = {isa = PBXBuildFile; productRef = D1EF162C0A9ECCCB32C48641 /* ChatViewportKit */; };
 		B1D434BF9B6F7D48D9F3EC43 /* ChatViewportKitExampleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AA5DC1D2C03E54C3F66BF37 /* ChatViewportKitExampleApp.swift */; };
 		CF208FA906DC62D4A4553088 /* TranscriptLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29BE0B2BF8AF68080685753B /* TranscriptLabView.swift */; };
+		E1A2B3C4D5E6F7081234ABCD /* UKTranscriptLabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F7081234ABCD /* UKTranscriptLabView.swift */; };
+		E2B3C4D5E6F70819ABCDEF12 /* ChatViewportUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = F2B3C4D5E6F70819ABCDEF12 /* ChatViewportUIKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -17,6 +19,7 @@
 		2611A7D1DDEC7E3EB0013CE6 /* ChatViewportKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ChatViewportKit; path = ..; sourceTree = SOURCE_ROOT; };
 		29BE0B2BF8AF68080685753B /* TranscriptLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptLabView.swift; sourceTree = "<group>"; };
 		4AA5DC1D2C03E54C3F66BF37 /* ChatViewportKitExampleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewportKitExampleApp.swift; sourceTree = "<group>"; };
+		F1A2B3C4D5E6F7081234ABCD /* UKTranscriptLabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UKTranscriptLabView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -25,6 +28,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AB7B8D8176CBE94FC91DF37B /* ChatViewportKit in Frameworks */,
+				E2B3C4D5E6F70819ABCDEF12 /* ChatViewportUIKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -36,6 +40,7 @@
 			children = (
 				4AA5DC1D2C03E54C3F66BF37 /* ChatViewportKitExampleApp.swift */,
 				29BE0B2BF8AF68080685753B /* TranscriptLabView.swift */,
+				F1A2B3C4D5E6F7081234ABCD /* UKTranscriptLabView.swift */,
 			);
 			path = ChatViewportKitExample;
 			sourceTree = "<group>";
@@ -82,6 +87,7 @@
 			name = ChatViewportKitExample;
 			packageProductDependencies = (
 				D1EF162C0A9ECCCB32C48641 /* ChatViewportKit */,
+				F2B3C4D5E6F70819ABCDEF12 /* ChatViewportUIKit */,
 			);
 			productName = ChatViewportKitExample;
 			productReference = 17FE7A2244CCBBA3AFB74FDE /* ChatViewportKitExample.app */;
@@ -125,6 +131,7 @@
 			files = (
 				B1D434BF9B6F7D48D9F3EC43 /* ChatViewportKitExampleApp.swift in Sources */,
 				CF208FA906DC62D4A4553088 /* TranscriptLabView.swift in Sources */,
+				E1A2B3C4D5E6F7081234ABCD /* UKTranscriptLabView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -330,6 +337,10 @@
 		D1EF162C0A9ECCCB32C48641 /* ChatViewportKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ChatViewportKit;
+		};
+		F2B3C4D5E6F70819ABCDEF12 /* ChatViewportUIKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChatViewportUIKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

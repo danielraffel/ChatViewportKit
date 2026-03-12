@@ -4,7 +4,17 @@ import SwiftUI
 struct ChatViewportKitExampleApp: App {
     var body: some Scene {
         WindowGroup {
-            TranscriptLabView()
+            NavigationStack {
+                List {
+                    NavigationLink("SwiftUI Backend (LazyVStack)") {
+                        TranscriptLabView()
+                    }
+                    NavigationLink("UIKit Backend (UICollectionView)") {
+                        UKTranscriptLabView()
+                    }
+                }
+                .navigationTitle("ChatViewportKit")
+            }
         }
     }
 }

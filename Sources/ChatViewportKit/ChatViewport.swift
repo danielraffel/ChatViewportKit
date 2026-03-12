@@ -36,12 +36,10 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
             ScrollViewReader { proxy in
                 ScrollView(showsIndicators: configuration.showsIndicators) {
                     LazyVStack(spacing: configuration.spacing) {
-                        let items = Array(data)
-                        ForEach(items.indices, id: \.self) { index in
-                            let item = items[index]
-                            let itemID = item[keyPath: idKeyPath]
+                        ForEach(Array(data), id: idKeyPath) { item in
                             rowContent(item)
-                                .id(itemID)
+                                .id(item[keyPath: idKeyPath])
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
                     }
                     .frame(minHeight: outerProxy.size.height, alignment: .bottom)

@@ -21,8 +21,8 @@ Goal: Prove hard requirements are achievable with ScrollView + LazyVStack before
 - [x] **0.4** Prove bottom anchoring from first render with 1, 3, and 10 short rows — no startup jump
 - [x] **0.5** Prove `scrollToBottom`, `scrollToTop`, and `scrollTo(id:)` land correctly in repeated runs
 - [x] **0.6** Verify no inversion or rotation hacks are used anywhere
-- [ ] **0.7** Verify the view works inside NavigationStack and the top blur remains native
-- [ ] **0.8** Implement underfill append animation: filler shrink + row insertion in one animation transaction
+- [x] **0.7** Verify the view works inside NavigationStack and the top blur remains native
+- [x] **0.8** Implement underfill append animation: filler shrink + row insertion in one animation transaction
 - [ ] **0.9** Verify the underfill-to-overflow transition does not produce a one-frame snap (slowed playback test)
 - [ ] **0.10** Prove append burst of 20 short rows while pinned remains visually continuous
 - [ ] **0.11** Test prepend does not visually jump the viewport

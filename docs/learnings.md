@@ -29,6 +29,14 @@ Check this file before starting any work item.
 - **Solution**: Use `ForEach(items.indices, id: \.self)` with direct `.id(itemID)` on the content view
 - This keeps the `.id()` modifier on the actual row view, which ScrollViewReader can find
 - Raw SwiftUI `ForEach(messages) { msg in ... .id(msg.id) }` also works — the issue is specifically with intermediate wrapper types in the ForEach data source
+- `ForEach(Array(data), id: idKeyPath)` works for both scrollTo and animations — this is the correct pattern for generic data
+
+### ForEach with integer indices breaks animations on prepend
+- `ForEach(items.indices, id: \.self)` uses integer indices as stable identity
+- When items are prepended, indices shift: what was at index 0 is now at index N
+- SwiftUI treats this as "old item 0 changed content" rather than "new items were inserted"
+- This causes incorrect animations and diffing behavior
+- **Solution**: Always use the actual item ID (UUID, etc.) as the ForEach identity, not the array index
 
 ## Performance Notes
 

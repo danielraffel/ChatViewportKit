@@ -19,8 +19,8 @@ struct LabMessage: Identifiable {
 
 struct TranscriptLabView: View {
     @StateObject private var controller = ChatViewportController<UUID>()
-    @State private var messages: [LabMessage] = (1...3).map { LabMessage(text: "Message \($0)") }
-    @State private var nextIndex = 4
+    @State private var messages: [LabMessage] = [LabMessage(text: "Message 1")]
+    @State private var nextIndex = 2
     @State private var prependCounter = 0
     @State private var showDebugHUD = true
     @State private var testLog: String = ""

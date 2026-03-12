@@ -134,7 +134,10 @@ struct TranscriptLabView: View {
                     composerText = ""
                     nextIndex += 1
                 }
-                controller.scrollToBottom()
+                // Defer so body re-evaluates with new data before scrolling
+                DispatchQueue.main.async {
+                    controller.scrollToBottom()
+                }
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
@@ -210,6 +213,9 @@ struct TranscriptLabView: View {
                 withAnimation {
                     messages.append(LabMessage(text: "Burst \(nextIndex)"))
                     nextIndex += 1
+                }
+                DispatchQueue.main.async {
+                    controller.scrollToBottom()
                 }
             }
         }
@@ -453,6 +459,80 @@ struct TranscriptLabView: View {
             return "unknown"
         }
         return msg.text
+    }
+
+    // MARK: - Smoothness Test
+
+    private func runSmoothTest() {
+        // Phase 1: Underfill — add messages one at a time, bottom-anchored
+        NSLog("[SMOOTH] Phase 1: Underfill append")
+        for i in 0..<5 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.3) {
+                withAnimation {
+                    messages.append(LabMessage(text: "Message \(nextIndex)"))
+                    nextIndex += 1
+                }
+            }
+        }
+
+        // Phase 2: Overflow transition — add enough to fill and overflow
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            NSLog("[SMOOTH] Phase 2: Overflow transition")
+            for i in 0..<15 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.1) {
+                    withAnimation {
+                        messages.append(LabMessage(text: "Message \(nextIndex)"))
+                        nextIndex += 1
+                    }
+                }
+            }
+        }
+
+        // Phase 3: Scroll to top, then back to bottom
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            NSLog("[SMOOTH] Phase 3: scrollToTop")
+            controller.scrollToTop()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 6.5) {
+            NSLog("[SMOOTH] Phase 3: scrollToBottom")
+            controller.scrollToBottom()
+        }
+
+        // Phase 4: Composer-style send (simulated)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+            NSLog("[SMOOTH] Phase 4: Composer sends")
+            let sends = ["Hey there", "How's it going?", "Just testing smoothness"]
+            for (i, text) in sends.enumerated() {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.8) {
+                    withAnimation {
+                        messages.append(LabMessage(text: text))
+                        nextIndex += 1
+                    }
+                    DispatchQueue.main.async {
+                        controller.scrollToBottom()
+                    }
+                }
+            }
+        }
+
+        // Phase 5: Prepend while at bottom
+        DispatchQueue.main.asyncAfter(deadline: .now() + 11.0) {
+            NSLog("[SMOOTH] Phase 5: Prepend 10 while at bottom")
+            let before = findVisibleMessageText()
+            controller.prepareToPrepend()
+            var batch: [LabMessage] = []
+            for _ in 0..<10 {
+                prependCounter += 1
+                batch.append(LabMessage(text: "History \(prependCounter)"))
+            }
+            messages.insert(contentsOf: batch, at: 0)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                let after = findVisibleMessageText()
+                NSLog("[SMOOTH] Prepend result: before=\(before) after=\(after)")
+                testLog = "Done! Pin:\(controller.isPinnedToBottom ? "Y" : "N")"
+                NSLog("[SMOOTH] ALL SMOOTH TESTS COMPLETE")
+            }
+        }
     }
 
     private func asyncGrowRandomMessage() {

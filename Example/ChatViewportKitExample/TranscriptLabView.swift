@@ -50,10 +50,10 @@ struct TranscriptLabView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
                         Button("Nav Title") {
-                            useLargeTitle.toggle()
-                            // Scroll to top so the nav bar style change is visible
+                            // Scroll to top first, then toggle after arriving
+                            controller.scrollToTop(animated: false)
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                controller.scrollToTop()
+                                useLargeTitle.toggle()
                             }
                         }
                         .foregroundColor(useLargeTitle ? .accentColor : .secondary)

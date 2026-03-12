@@ -16,8 +16,8 @@ This is the source of truth for implementation progress. Read at the start of EV
 Goal: Prove hard requirements are achievable with ScrollView + LazyVStack before building anything real.
 
 - [x] **0.1** Create Swift Package structure: `ChatViewportKit` (core), `ChatViewportKitExample` (demo app)
-- [ ] **0.2** Create minimal "Transcript Lab" test screen inside the example app
-- [ ] **0.3** Implement minimal ChatViewport shell: ScrollViewReader + ScrollView + LazyVStack
+- [x] **0.2** Create minimal "Transcript Lab" test screen inside the example app
+- [x] **0.3** Implement minimal ChatViewport shell: ScrollViewReader + ScrollView + LazyVStack
 - [ ] **0.4** Prove bottom anchoring from first render with 1, 3, and 10 short rows — no startup jump
 - [ ] **0.5** Prove `scrollToBottom`, `scrollToTop`, and `scrollTo(id:)` land correctly in repeated runs
 - [ ] **0.6** Verify no inversion or rotation hacks are used anywhere

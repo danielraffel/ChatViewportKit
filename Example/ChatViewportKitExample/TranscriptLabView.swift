@@ -6,12 +6,12 @@ import ChatViewportKit
 struct LabMessage: Identifiable {
     let id: UUID
     var text: String
-    var height: CGFloat?
+    var extraHeight: CGFloat?
 
-    init(text: String, height: CGFloat? = nil) {
+    init(text: String, extraHeight: CGFloat? = nil) {
         self.id = UUID()
         self.text = text
-        self.height = height
+        self.extraHeight = extraHeight
     }
 }
 
@@ -21,56 +21,162 @@ struct TranscriptLabView: View {
     @StateObject private var controller = ChatViewportController<UUID>()
     @State private var messages: [LabMessage] = []
     @State private var nextIndex = 1
+    @State private var prependCounter = 0
+    @State private var showDebugHUD = true
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                ChatViewport(messages, controller: controller) { message in
-                    Text(message.text)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(height: message.height)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
+                // Debug HUD
+                if showDebugHUD {
+                    debugHUD
                 }
 
+                // Chat viewport
+                ChatViewport(messages, controller: controller) { message in
+                    messageRow(message)
+                }
+
+                // Controls
                 controlBar
             }
             .navigationTitle("Transcript Lab")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(showDebugHUD ? "Hide HUD" : "Show HUD") {
+                        showDebugHUD.toggle()
+                    }
+                    .font(.caption)
+                }
+            }
         }
     }
 
-    private var controlBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                Button("+ 1") { appendMessages(1) }
-                Button("+ 5") { appendMessages(5) }
-                Button("+ 50") { appendMessages(50) }
-                Button("Prepend 5") { prependMessages(5) }
-                Button("⬇ Bottom") { controller.scrollToBottom() }
-                Button("⬆ Top") { controller.scrollToTop() }
-                Button("Clear") { messages.removeAll(); nextIndex = 1 }
-            }
-            .buttonStyle(.borderedProminent)
-            .padding()
+    // MARK: - Message Row
+
+    private func messageRow(_ message: LabMessage) -> some View {
+        HStack {
+            Text(message.text)
+                .padding(12)
+            Spacer()
         }
+        .frame(minHeight: message.extraHeight)
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+        .padding(.horizontal)
+    }
+
+    // MARK: - Debug HUD
+
+    private var debugHUD: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Messages: \(messages.count)")
+            Text("First ID: \(messages.first?.id.uuidString.prefix(8) ?? "—")")
+            Text("Last ID: \(messages.last?.id.uuidString.prefix(8) ?? "—")")
+        }
+        .font(.system(.caption2, design: .monospaced))
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.systemGray5).opacity(0.8))
+    }
+
+    // MARK: - Controls
+
+    private var controlBar: some View {
+        VStack(spacing: 4) {
+            // Row 1: Add messages
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    Group {
+                        Button("+1") { appendMessages(1) }
+                        Button("+3") { appendMessages(3) }
+                        Button("+10") { appendMessages(10) }
+                        Button("+50") { appendMessages(50) }
+                        Button("Burst 20") { burstAppend(20) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+                .padding(.horizontal)
+            }
+
+            // Row 2: Navigation & manipulation
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    Group {
+                        Button("Prepend 5") { prependMessages(5) }
+                        Button("⬇ Bottom") { controller.scrollToBottom() }
+                        Button("⬆ Top") { controller.scrollToTop() }
+                        Button("Expand Last") { expandLastMessage() }
+                        Button("Async Grow") { asyncGrowRandomMessage() }
+                        Button("Clear") {
+                            messages.removeAll()
+                            nextIndex = 1
+                            prependCounter = 0
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.vertical, 8)
         .background(Color(.systemBackground))
     }
 
+    // MARK: - Actions
+
     private func appendMessages(_ count: Int) {
-        for _ in 0..<count {
-            messages.append(LabMessage(text: "Message \(nextIndex)"))
-            nextIndex += 1
+        withAnimation {
+            for _ in 0..<count {
+                messages.append(LabMessage(text: "Message \(nextIndex)"))
+                nextIndex += 1
+            }
+        }
+    }
+
+    private func burstAppend(_ count: Int) {
+        // Simulate rapid message arrival
+        for i in 0..<count {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) {
+                withAnimation {
+                    messages.append(LabMessage(text: "Burst \(nextIndex)"))
+                    nextIndex += 1
+                }
+            }
         }
     }
 
     private func prependMessages(_ count: Int) {
-        var newMessages: [LabMessage] = []
-        for i in 0..<count {
-            newMessages.append(LabMessage(text: "Old message \(count - i)"))
+        withAnimation {
+            var newMessages: [LabMessage] = []
+            for _ in 0..<count {
+                prependCounter += 1
+                newMessages.append(LabMessage(text: "History \(prependCounter) (prepended)"))
+            }
+            messages.insert(contentsOf: newMessages, at: 0)
         }
-        messages.insert(contentsOf: newMessages, at: 0)
+    }
+
+    private func expandLastMessage() {
+        guard !messages.isEmpty else { return }
+        withAnimation {
+            messages[messages.count - 1].extraHeight = 200
+            messages[messages.count - 1].text += "\n[Expanded to 200pt]"
+        }
+    }
+
+    private func asyncGrowRandomMessage() {
+        guard !messages.isEmpty else { return }
+        let index = Int.random(in: 0..<messages.count)
+        // Simulate async content load (e.g., image finishing)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            withAnimation {
+                messages[index].extraHeight = 150
+                messages[index].text += "\n[Async grew to 150pt]"
+            }
+        }
     }
 }

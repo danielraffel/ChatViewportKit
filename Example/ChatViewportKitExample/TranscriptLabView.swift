@@ -464,4 +464,5 @@ struct TranscriptLabView: View {
             }
         }
     }
+
 }

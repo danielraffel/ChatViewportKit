@@ -35,11 +35,18 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     }
 
     public var body: some View {
+        // Update controller IDs during body evaluation where data is always fresh.
+        // onChange closures capture stale data references, so we cannot read data there.
+        let _ = {
+            controller.firstItemID = data.first?[keyPath: idKeyPath]
+            controller.lastItemID = data.last?[keyPath: idKeyPath]
+        }()
+
         GeometryReader { outerProxy in
             ScrollViewReader { proxy in
                 ScrollView(showsIndicators: configuration.showsIndicators) {
                     LazyVStack(spacing: configuration.spacing) {
-                        ForEach(data, id: idKeyPath) { item in
+                        ForEach(Array(data), id: idKeyPath) { item in
                             let itemID = item[keyPath: idKeyPath]
                             rowContent(item)
                                 .id(itemID)
@@ -95,18 +102,15 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                     scrollProxy = proxy
                     viewportHeight = outerProxy.size.height
                     previousCount = data.count
-                    updateControllerIDs()
                 }
                 .onChange(of: outerProxy.size.height) { newHeight in
                     viewportHeight = newHeight
                 }
                 .onChange(of: data.count) { newCount in
-                    let currentLastID = data.last?[keyPath: idKeyPath]
-                    updateControllerIDs()
+                    // NOTE: do NOT read `data` here — it may be stale.
+                    // Use controller.firstItemID / controller.lastItemID which were
+                    // updated during body evaluation with fresh data.
 
-                    // Use freezeAnchor flag (set by prepareToPrepend) as the prepend signal.
-                    // This is more reliable than ID-change detection because SwiftUI's
-                    // onChange closure may capture stale data references.
                     let isPrepend = controller.freezeAnchor && newCount > previousCount
                     let isAppend = !isPrepend && newCount > previousCount
 
@@ -143,7 +147,8 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                             proxy.scrollTo(anchorID, anchor: .top)
                             controller.freezeAnchor = false
                         }
-                    } else if isAppend && controller.isPinnedToBottom, let lastID = currentLastID {
+                    } else if isAppend && controller.isPinnedToBottom,
+                              let lastID = controller.lastItemID {
                         withAnimation {
                             proxy.scrollTo(lastID, anchor: .bottom)
                         }
@@ -175,11 +180,6 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
             // Notify VoiceOver that the layout changed due to programmatic scroll
             UIAccessibility.post(notification: .layoutChanged, argument: nil)
         }
-    }
-
-    private func updateControllerIDs() {
-        controller.firstItemID = data.first?[keyPath: idKeyPath]
-        controller.lastItemID = data.last?[keyPath: idKeyPath]
     }
 
     private func updateBottomPinState(scrollOffset: CGFloat) {

@@ -49,11 +49,11 @@ struct TranscriptLabView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
-                        Button(useLargeTitle ? "Nav Title" : "Nav Inline") {
-                            controller.scrollToTop(animated: false)
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                useLargeTitle.toggle()
-                            }
+                        Button(useLargeTitle ? "→ Inline" : "→ Title") {
+                            useLargeTitle.toggle()
+                            // Force scroll to absolute top so large title can expand.
+                            // proxy.scrollTo leaves a small offset; need contentOffset = .zero.
+                            controller.scrollToAbsoluteTop()
                         }
                         .foregroundColor(.accentColor)
                         Button("HUD") {

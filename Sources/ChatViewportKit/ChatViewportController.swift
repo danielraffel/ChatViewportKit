@@ -142,8 +142,27 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
     }
 
     public func scrollToTop(animated: Bool = true) {
-        guard let id = firstItemID else { return }
-        issueCommand(.scrollTo(id: id, anchor: .top, animated: animated))
+        // Prefer UIScrollView bridge — sets offset to exactly zero,
+        // which is required for NavigationStack large title to expand.
+        if let scrollView = scrollViewRef {
+            DispatchQueue.main.async { [weak scrollView] in
+                guard let scrollView = scrollView else { return }
+                scrollView.setContentOffset(.zero, animated: animated)
+            }
+        } else if let id = firstItemID {
+            issueCommand(.scrollTo(id: id, anchor: .top, animated: animated))
+        }
+        transitionMode(.freeBrowsing(anchor: nil))
+    }
+
+    /// Scroll to absolute top (offset zero) without animation.
+    /// Forces the NavigationStack large title to expand immediately.
+    public func scrollToAbsoluteTop() {
+        if let scrollView = scrollViewRef {
+            scrollView.setContentOffset(.zero, animated: false)
+        } else if let id = firstItemID {
+            issueCommand(.scrollTo(id: id, anchor: .top, animated: false))
+        }
         transitionMode(.freeBrowsing(anchor: nil))
     }
 

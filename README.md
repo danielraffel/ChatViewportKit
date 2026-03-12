@@ -160,7 +160,7 @@ NavigationStack {
 }
 ```
 
-Keyboard avoidance, composer layout, and navigation bar behavior are all handled by SwiftUI's standard layout system — ChatViewportKit doesn't interfere with any of it.
+Keyboard avoidance and composer layout are handled by SwiftUI's standard layout system — ChatViewportKit doesn't interfere with any of it. When the keyboard appears or disappears while pinned to the bottom, the viewport automatically scrolls to keep the last message visible.
 
 ## Example App
 
@@ -178,7 +178,7 @@ The repo includes a **Transcript Lab** example app (`Example/`) that exercises e
 
 **Navigation modes**: **→ Title** / **→ Inline** button switches between `.large` and `.inline` navigation bar title display modes. Scrolls to absolute top on toggle so the large title expands immediately. Tests that the viewport works correctly with both styles and that the iOS nav bar blur effect is preserved.
 
-**Composer**: Multiline text field with send button — keyboard show/hide doesn't break bottom pinning.
+**Composer**: Multiline text field with send button. Keyboard show/hide keeps the last message visible. Swipe down on the composer or tap the message area to dismiss the keyboard.
 
 **Debug HUD**: Toggle with the **HUD** button in the toolbar. Live readout of message count, viewport mode, pinned state, top visible item, UIScrollView bridge status, and anchor freeze state.
 
@@ -215,7 +215,7 @@ All operations are well under the 16.67ms frame budget for 60fps. `LazyVStack` r
 - **`scrollTo(id:)` has range limits.** SwiftUI's `ScrollViewReader` can fail for items far from the current render window in a `LazyVStack`. `scrollToBottom()` and `scrollToTop()` use the UIScrollView bridge and work reliably at any distance; `scrollTo(id:)` for arbitrary IDs is limited to ~15–20 positions from the current viewport.
 - **Data must have stable IDs.** Use UUIDs or other stable identifiers — not array indices.
 - **iOS 16+ only.**
-- **No built-in keyboard handling.** By design — compose the viewport with your own composer view in a `VStack`, and SwiftUI handles the rest.
+- **No built-in keyboard handling.** By design — compose the viewport with your own composer view in a `VStack`, and SwiftUI handles the rest. The viewport does automatically scroll to bottom on keyboard show/hide when pinned.
 
 ## License
 

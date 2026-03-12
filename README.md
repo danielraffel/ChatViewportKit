@@ -176,7 +176,7 @@ The repo includes a **Transcript Lab** example app (`Example/`) that exercises e
 
 **Dynamic type**: Toggle between standard and accessibility-XXL text sizes mid-browse.
 
-**Navigation modes**: **Large** / **Inline** toggles between `.large` and `.inline` navigation bar title display modes — tests that the viewport works correctly with both styles and that the iOS nav bar blur effect is preserved.
+**Navigation modes**: **Nav Title** / **Nav Inline** button cycles between `.large` and `.inline` navigation bar title display modes — scrolls to top on toggle so you can see the change. Pull down slightly at the top to trigger the large title appearance (standard iOS behavior). Tests that the viewport works correctly with both styles and that the iOS nav bar blur effect is preserved.
 
 **Composer**: Multiline text field with send button — keyboard show/hide doesn't break bottom pinning.
 

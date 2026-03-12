@@ -49,14 +49,13 @@ struct TranscriptLabView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 8) {
-                        Button("Nav Title") {
-                            // Scroll to top first, then toggle after arriving
+                        Button(useLargeTitle ? "Nav Title" : "Nav Inline") {
                             controller.scrollToTop(animated: false)
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 useLargeTitle.toggle()
                             }
                         }
-                        .foregroundColor(useLargeTitle ? .accentColor : .secondary)
+                        .foregroundColor(.accentColor)
                         Button("HUD") {
                             showDebugHUD.toggle()
                         }

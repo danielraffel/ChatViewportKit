@@ -14,7 +14,14 @@ Check this file before starting any work item.
 
 ## Known SwiftUI Scroll Challenges
 
-(Add learnings here as they are discovered during implementation)
+### LazyVStack + topFill spacer chicken-and-egg problem
+- A separate `Color.clear.frame(height: topFill)` spacer ABOVE a LazyVStack does NOT work
+- When topFill = viewportHeight (content not yet measured), the spacer pushes the LazyVStack entirely below the viewport
+- Since LazyVStack is lazy, it won't render any rows that are off-screen, so content height stays 0 forever
+- **Solution**: Use `.frame(minHeight: viewportHeight, alignment: .bottom)` on the LazyVStack itself
+- This makes the LazyVStack occupy the full viewport height but aligns its content to the bottom
+- When content < viewport, alignment pushes rows to bottom; when content > viewport, the frame grows naturally
+- This avoids the chicken-and-egg problem because the rows are always within the visible frame
 
 ## Performance Notes
 

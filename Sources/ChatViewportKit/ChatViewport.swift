@@ -14,9 +14,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     @ObservedObject private var controller: ChatViewportController<ID>
     private let configuration: ChatViewportConfiguration
 
-    // Internal layout state
     @State private var viewportHeight: CGFloat = 0
-    @State private var contentHeight: CGFloat = 0
 
     public init(
         _ data: Data,
@@ -32,38 +30,17 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
         self.rowContent = rowContent
     }
 
-    /// The top filler height that pushes underfilled content to the bottom.
-    private var topFill: CGFloat {
-        max(0, viewportHeight - contentHeight)
-    }
-
     public var body: some View {
         GeometryReader { outerProxy in
             ScrollViewReader { scrollProxy in
                 ScrollView(showsIndicators: configuration.showsIndicators) {
-                    VStack(spacing: 0) {
-                        // Top filler: pushes content to bottom when underfilled
-                        Color.clear
-                            .frame(height: topFill)
-
-                        LazyVStack(spacing: configuration.spacing) {
-                            ForEach(dataElements, id: \.id) { element in
-                                rowContent(element.item)
-                                    .id(element.id)
-                            }
+                    LazyVStack(spacing: configuration.spacing) {
+                        ForEach(dataElements, id: \.id) { element in
+                            rowContent(element.item)
+                                .id(element.id)
                         }
-                        .background(
-                            GeometryReader { contentProxy in
-                                Color.clear.preference(
-                                    key: ContentHeightKey.self,
-                                    value: contentProxy.size.height
-                                )
-                            }
-                        )
                     }
-                }
-                .onPreferenceChange(ContentHeightKey.self) { height in
-                    contentHeight = height
+                    .frame(minHeight: outerProxy.size.height, alignment: .bottom)
                 }
                 .onAppear {
                     controller.scrollProxy = scrollProxy
@@ -96,15 +73,6 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
     private struct IdentifiedElement: Identifiable {
         let id: ID
         let item: Data.Element
-    }
-}
-
-// MARK: - Preference Keys
-
-private struct ContentHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat { 0 }
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 

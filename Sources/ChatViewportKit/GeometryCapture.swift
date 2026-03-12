@@ -6,7 +6,7 @@ import SwiftUI
 struct ContentHeightPreference: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+        value = max(value, nextValue())
     }
 }
 
@@ -16,7 +16,7 @@ struct ContentHeightPreference: PreferenceKey {
 struct ScrollOffsetPreference: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+        value = min(value, nextValue())
     }
 }
 
@@ -31,11 +31,22 @@ struct RowFrame<ID: Hashable>: Equatable {
     var height: CGFloat { maxY - minY }
 }
 
-/// Preference key that collects visible row frames.
+/// Preference key that folds visible row frames down to the single topmost visible row.
+/// Only rows with maxY > 0 (visible in viewport) are candidates.
+/// This avoids accumulating all rows into an array and sorting — O(1) per reduce call.
 struct RowFramesPreference<ID: Hashable>: PreferenceKey {
     static var defaultValue: [RowFrame<ID>] { [] }
     static func reduce(value: inout [RowFrame<ID>], nextValue: () -> [RowFrame<ID>]) {
-        value.append(contentsOf: nextValue())
+        for frame in nextValue() {
+            guard frame.maxY > 0 else { continue }
+            if let current = value.first {
+                if frame.minY < current.minY {
+                    value = [frame]
+                }
+            } else {
+                value = [frame]
+            }
+        }
     }
 }
 

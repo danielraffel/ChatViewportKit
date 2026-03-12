@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Configuration for a `ChatViewport`.
-public struct ChatViewportConfiguration {
+public struct ChatViewportConfiguration: Equatable {
     public var spacing: CGFloat
     public var bottomPinThreshold: CGFloat
     public var topLoadTriggerOffset: CGFloat

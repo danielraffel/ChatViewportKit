@@ -6,14 +6,25 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
 
     // MARK: - Published state
 
-    /// The current scroll command to execute (consumed by ChatViewport).
-    @Published internal var pendingCommand: ScrollCommand<ID>?
-
     /// The current viewport mode — drives behavior on data changes and scroll events.
-    @Published public private(set) var mode: ViewportMode<ID> = .initialBottomAnchored
+    public private(set) var mode: ViewportMode<ID> = .initialBottomAnchored
 
-    /// Whether the viewport is currently pinned to the bottom.
-    @Published public private(set) var isPinnedToBottom: Bool = true
+    /// Whether the viewport is currently pinned to the bottom (derived from mode).
+    public var isPinnedToBottom: Bool {
+        switch mode {
+        case .initialBottomAnchored, .pinnedToBottom: return true
+        case .freeBrowsing, .programmaticScroll, .correctingAfterDataChange: return false
+        }
+    }
+
+    // MARK: - Command dispatch (non-published; generation counter triggers view)
+
+    /// The current scroll command to execute (consumed by ChatViewport).
+    internal var pendingCommand: ScrollCommand<ID>?
+
+    /// Generation counter — the view observes this to detect new commands.
+    /// Using a counter avoids the double-publish of set-then-nil on pendingCommand.
+    @Published internal var commandGeneration: UInt64 = 0
 
     // MARK: - Internal state (set by ChatViewport)
 
@@ -37,11 +48,6 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
 
     /// Whether the anchor is currently frozen (for debugging).
     public var freezeAnchorState: Bool { freezeAnchor }
-
-    /// Generation counter to prevent stale commands from executing.
-    /// Incremented each time a new command is issued; the view checks
-    /// this before executing to skip superseded commands.
-    internal var commandGeneration: UInt64 = 0
 
     /// Callback when pinned-to-bottom state changes (for host "jump to latest" UI).
     public var onBottomPinnedChanged: ((Bool) -> Void)?
@@ -74,24 +80,19 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject {
     }
 
     private func issueCommand(_ command: ScrollCommand<ID>) {
-        commandGeneration &+= 1
         pendingCommand = command
+        commandGeneration &+= 1
     }
 
     // MARK: - Mode transitions (called by ChatViewport internals)
 
     internal func transitionMode(_ newMode: ViewportMode<ID>) {
+        guard mode != newMode else { return }
         let wasPinned = isPinnedToBottom
+        objectWillChange.send()
         mode = newMode
-        let nowPinned: Bool
-        switch newMode {
-        case .initialBottomAnchored, .pinnedToBottom:
-            nowPinned = true
-        case .freeBrowsing, .programmaticScroll, .correctingAfterDataChange:
-            nowPinned = false
-        }
+        let nowPinned = isPinnedToBottom
         if nowPinned != wasPinned {
-            isPinnedToBottom = nowPinned
             onBottomPinnedChanged?(nowPinned)
         }
     }

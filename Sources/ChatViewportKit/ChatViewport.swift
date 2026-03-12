@@ -39,19 +39,20 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
             ScrollViewReader { proxy in
                 ScrollView(showsIndicators: configuration.showsIndicators) {
                     LazyVStack(spacing: configuration.spacing) {
-                        ForEach(Array(data), id: idKeyPath) { item in
+                        ForEach(data, id: idKeyPath) { item in
                             let itemID = item[keyPath: idKeyPath]
                             rowContent(item)
                                 .id(itemID)
                                 .transition(.move(edge: .bottom).combined(with: .opacity))
                                 .background(
                                     GeometryReader { rowProxy in
+                                        let frame = rowProxy.frame(in: .named(viewportCoordinateSpace))
                                         Color.clear.preference(
                                             key: RowFramesPreference<ID>.self,
                                             value: [RowFrame(
                                                 id: itemID,
-                                                minY: rowProxy.frame(in: .named(viewportCoordinateSpace)).minY,
-                                                maxY: rowProxy.frame(in: .named(viewportCoordinateSpace)).maxY
+                                                minY: frame.minY,
+                                                maxY: frame.maxY
                                             )]
                                         )
                                     }
@@ -88,8 +89,7 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                 }
                 .onPreferenceChange(RowFramesPreference<ID>.self) { frames in
                     guard !controller.freezeAnchor else { return }
-                    let sorted = frames.sorted { $0.minY < $1.minY }
-                    controller.topVisibleItemID = sorted.first(where: { $0.maxY > 0 })?.id
+                    controller.topVisibleItemID = frames.first?.id
                 }
                 .onAppear {
                     scrollProxy = proxy
@@ -116,8 +116,9 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
                             let capturedContentSize = scrollView.contentSize.height
 
                             // Defer offset adjustment until after SwiftUI completes layout.
-                            // Using async (next run loop) is enough for SwiftUI to update contentSize.
+                            // layoutIfNeeded() flushes pending UIKit layout before reading contentSize.
                             DispatchQueue.main.async {
+                                scrollView.layoutIfNeeded()
                                 let newSize = scrollView.contentSize.height
                                 let delta = newSize - capturedContentSize
                                 if delta > 0 {
@@ -151,12 +152,9 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
 
                     previousCount = newCount
                 }
-                .onChange(of: controller.pendingCommand) { command in
-                    guard let command = command else { return }
+                .onChange(of: controller.commandGeneration) { _ in
+                    guard let command = controller.pendingCommand else { return }
                     executeCommand(command, proxy: proxy)
-                    DispatchQueue.main.async {
-                        controller.pendingCommand = nil
-                    }
                 }
             }
         }

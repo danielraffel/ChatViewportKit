@@ -285,7 +285,7 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
         let targetIdx = orderedIDs.firstIndex(of: targetID)
         let contentSize = scrollView.contentSize.height
 
-        if heightIndex.heights.count > 100, let _ = targetIdx {
+        if heightIndex.heights.count > 30, let _ = targetIdx {
             estimatedOffset = heightIndex.estimatedOffset(
                 to: targetID, in: orderedIDs, spacing: configSpacing
             )
@@ -315,7 +315,7 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
             scrollView: scrollView,
             sessionGen: sessionGen,
             passNumber: 1,
-            maxPasses: 3
+            maxPasses: 6
         )
     }
 
@@ -424,31 +424,31 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
         let currentOffset = scrollView.contentOffset.y
         let targetIdx = orderedIDs.firstIndex(of: targetID)
 
-        if let visibleID = topVisibleItemID,
+        // Use height-index-based estimation when we have enough data (accumulated
+        // across probe passes). Falls back to proportional estimation otherwise.
+        if heightIndex.heights.count > 30, let targIdx = targetIdx {
+            let targetOffset = heightIndex.estimatedOffset(
+                to: targetID, in: orderedIDs, spacing: configSpacing
+            )
+            scrollView.setContentOffset(CGPoint(x: 0, y: targetOffset - topInset), animated: false)
+        } else if let visibleID = topVisibleItemID,
            let visibleIdx = orderedIDs.firstIndex(of: visibleID),
            let targIdx = targetIdx {
-            // Use proportional per-item offset from contentSize (more accurate than
-            // avgHeight when samples are few or heights vary significantly).
             let delta = targIdx - visibleIdx
             let contentSize = scrollView.contentSize.height
             let perItem = contentSize / CGFloat(orderedIDs.count)
             let jump = CGFloat(delta) * perItem
             let correctedOffset = currentOffset + jump
-            // print("[PROBE] pass \(passNumber): visible=\(visibleIdx), target=\(targIdx), delta=\(delta), perItem=\(String(format: "%.1f", perItem))")
             scrollView.setContentOffset(CGPoint(x: 0, y: correctedOffset), animated: false)
         } else if let targIdx = targetIdx {
-            // No visible anchor. Use proportional estimate from content size
-            // (more reliable than heightIndex average with few samples).
             let contentSize = scrollView.contentSize.height
             let total = CGFloat(orderedIDs.count)
             let proportionalOffset = contentSize * (CGFloat(targIdx) / total)
-            // print("[PROBE] pass \(passNumber): proportional re-estimate to \(Int(proportionalOffset))")
             scrollView.setContentOffset(CGPoint(x: 0, y: proportionalOffset - topInset), animated: false)
         } else {
             let reEstimate = heightIndex.estimatedOffset(
                 to: targetID, in: orderedIDs, spacing: configSpacing
             )
-            // print("[PROBE] pass \(passNumber): fallback re-estimate to \(Int(reEstimate))")
             scrollView.setContentOffset(CGPoint(x: 0, y: reEstimate - topInset), animated: false)
         }
 

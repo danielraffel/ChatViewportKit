@@ -206,21 +206,27 @@ The repo includes an example app (`Example/`) with both backends. A picker root 
 
 Each backend exercises every capability:
 
-**Append controls**: Add 1, 3, 10, 50, 5,000, or 10,000 messages. Burst-append 20 messages with 50ms spacing to simulate streaming.
+**Append**: **+1**, **+3**, **+10**, **+50**, **+5K**, **+10K** add messages. **Burst 20** appends 20 messages with 50ms spacing to simulate streaming.
 
-**Prepend controls**: Insert 1, 5, 10, or 50 older messages at the top — scroll position stays put.
+**Prepend**: **Pre 1/5/10/50** insert older messages at the top — scroll position stays put.
 
-**Scroll controls**: Jump to bottom, jump to top, scroll to middle by ID.
+**Scroll**: **⬇ Bottom** and **⬆ Top** jump to ends. **→ Mid** (toolbar) scrolls to the middle item by ID. Enter a number in the **#** field and tap **Go** to jump to a specific message index.
 
 **Height mutation**: **Expand** sets the last message to 200pt tall (simulates a card or embed loading in-place). **Grow** picks a random message and increases its height to 150pt after a 0.5s delay (simulates an image finishing download — tests that async height changes don't jump the viewport).
 
-**Dynamic type**: Toggle between standard and accessibility-XXL text sizes mid-browse.
+**Variable heights**: **VarH** loads 10,000 messages where every 3rd row has a different height. Tests scroll performance and layout stability with mixed sizes.
 
-**Navigation modes**: **→ Title** / **→ Inline** button switches between `.large` and `.inline` navigation bar title display modes. Scrolls to absolute top on toggle so the large title expands immediately. Tests that the viewport works correctly with both styles and that the iOS nav bar blur effect is preserved.
+**Dynamic type**: **Std→AX** / **AX→Std** toggles between standard and accessibility-XXL text sizes mid-browse.
+
+**Stress test**: **Stress** runs a timed sequence — load 10K variable-height rows, scroll to middle, append 50, prepend 50, burst-append 20, mutate a height. Timings are logged to the debug HUD and console (`[STRESS]` tags).
+
+**Navigation modes**: **Title** / **Inline** (toolbar) switches between `.large` and `.inline` navigation bar title display modes. Scrolls to absolute top on toggle so the large title expands immediately.
 
 **Composer**: Multiline text field with send button. Keyboard show/hide keeps the last message visible. Swipe down on the composer or tap the message area to dismiss the keyboard.
 
-**Debug HUD**: Toggle with the **HUD** button in the toolbar. Live readout of message count, viewport mode, pinned state, top visible item, UIScrollView bridge status, and anchor freeze state.
+**Clear**: Removes all messages and resets state.
+
+**Debug HUD**: Toggle with **HUD** (toolbar). Live readout of message count, viewport mode, pinned state, top visible item, scroll view bridge status, and anchor freeze state.
 
 To run it:
 

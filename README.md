@@ -216,7 +216,7 @@ Each backend exercises every capability:
 
 **Variable heights**: **VarH** loads 10,000 messages where every 3rd row has a different height. Tests scroll performance and layout stability with mixed sizes.
 
-**Dynamic type**: **Std→AX** / **AX→Std** toggles between standard and accessibility-XXL text sizes mid-browse.
+**Dynamic type**: **DynType** toggles between standard and accessibility-XXL text sizes mid-browse.
 
 **Stress test**: **Stress** runs a timed sequence — load 10K variable-height rows, scroll to middle, append 50, prepend 50, burst-append 20, mutate a height. Timings are logged to the debug HUD and console (`[STRESS]` tags).
 

@@ -217,7 +217,7 @@ struct TranscriptLabView: View {
                         }
                         Button("Expand") { expandLastMessage() }
                         Button("Grow") { asyncGrowRandomMessage() }
-                        Button(useAccessibilitySize ? "AX→Std" : "Std→AX") {
+                        Button(useAccessibilitySize ? "DynType ✓" : "DynType") {
                             useAccessibilitySize.toggle()
                             testLog = "DynType: \(useAccessibilitySize ? "AX-XXL" : "standard")"
                         }

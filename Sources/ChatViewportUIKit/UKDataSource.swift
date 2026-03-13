@@ -70,6 +70,18 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
         var snapshot = NSDiffableDataSourceSnapshot<Section, ItemIdentifier>()
         snapshot.appendSections([.main])
         snapshot.appendItems(orderedIDs.map { ItemIdentifier(id: $0) }, toSection: .main)
+
+        // Reconfigure items that already exist so content/height mutations
+        // (Expand, Grow, Dynamic Type) are picked up. reconfigureItems only
+        // re-renders visible cells, so this is efficient even at 10K+ items.
+        if let existing = diffableDataSource?.snapshot() {
+            let existingSet = Set(existing.itemIdentifiers)
+            let toReconfigure = snapshot.itemIdentifiers.filter { existingSet.contains($0) }
+            if !toReconfigure.isEmpty {
+                snapshot.reconfigureItems(toReconfigure)
+            }
+        }
+
         diffableDataSource?.apply(snapshot, animatingDifferences: animated)
     }
 

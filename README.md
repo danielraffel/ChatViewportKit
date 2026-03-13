@@ -230,6 +230,8 @@ Each backend exercises every capability:
 
 **Debug HUD**: Toggle with **HUD** (toolbar). Live readout of message count, viewport mode, pinned state, top visible item, scroll view bridge status, and anchor freeze state.
 
+**Comparing `scrollTo(id:)` across backends**: To see how each backend handles jumping to a specific item in a large variable-height dataset, try this in both backends: tap **+10K**, then **VarH**, scroll to a random position, type a number in the **#** field, and tap **Go**. The UIKit backend scrolls smoothly and near-instantly. The SwiftUI backend has a brief pause while the probe-align engine locates the target behind a snapshot overlay — it lands accurately, but the delay is noticeable.
+
 To run it:
 
 ```bash

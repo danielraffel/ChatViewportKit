@@ -237,16 +237,20 @@ xcodebuild -project Example/ChatViewportKitExample.xcodeproj \
 
 ## Performance
 
-Tested at 10,000 rows with mixed heights (every 3rd row has variable height):
+Both backends handle 10,000+ rows at 60fps. Lazy rendering means only visible rows (~11 at a time) are materialized, so scroll performance is O(1) regardless of total count.
+
+The example app's **Stress** button runs a timed sequence: load 10K variable-height rows, scroll to middle, append 50, prepend 50, burst-append 20. Timings are logged via `NSLog` with `[STRESS]` tags and displayed in the debug HUD. You can reproduce these on your own hardware by running the stress test in either backend.
+
+Data mutation times measured on the SwiftUI backend (iPhone 16 Pro simulator, `CFAbsoluteTimeGetCurrent` wall-clock):
 
 | Operation | Time |
 |---|---|
-| Load 10K messages | 5ms |
-| Append 50 at 10K | 8ms |
-| Prepend 50 at 10K | 0.85ms |
+| Load 10K messages | ~5ms |
+| Append 50 at 10K | ~8ms |
+| Prepend 50 at 10K | ~0.85ms |
 | Burst append (20 at 50ms) | ~0.4ms each |
 
-All operations are well under the 16.67ms frame budget for 60fps. `LazyVStack` renders only the visible rows (~11 at a time), so scroll performance is O(1) regardless of total count.
+These measure array mutation and SwiftUI state update time, not rendering. Actual frame times depend on device, row complexity, and whether animations are active. Both backends stay well under the 16.67ms frame budget for typical operations.
 
 ## Known Limitations
 

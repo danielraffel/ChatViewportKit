@@ -22,7 +22,9 @@ ChatViewportKit offers two independent scroll backends behind a shared protocol:
 
 ### ChatViewportSwiftUI (default)
 
-The render engine is a standard SwiftUI `ScrollView` + `LazyVStack` — no inverted scroll views, no rotation hacks. Content is bottom-anchored using `.frame(minHeight: viewportHeight, alignment: .bottom)`. A lightweight `UIScrollView` bridge provides pixel-precise offset correction for prepends and reliable `scrollTo(id:)` via a height-index + probe-align engine.
+The render engine is a standard SwiftUI `ScrollView` + `LazyVStack` — no inverted scroll views, no rotation hacks. Content is bottom-anchored using `.frame(minHeight: viewportHeight, alignment: .bottom)`. A lightweight `UIScrollView` bridge provides pixel-precise offset correction for prepends and reliable `scrollTo(id:)` via a probe-align engine.
+
+**How probe-align works**: `LazyVStack` only materializes visible rows (~11 at a time), so SwiftUI's built-in `ScrollViewProxy.scrollTo` can't reliably reach far-off items in large datasets. The probe-align engine solves this by: (1) capturing a snapshot overlay to hide the viewport, (2) jumping to an estimated offset based on measured heights, (3) waiting for SwiftUI to materialize rows at the new position, (4) checking if the target is now visible, (5) if not, computing a relative delta from the current visible position and jumping again, (6) once the target is found, using `ScrollViewProxy.scrollTo` for pixel-perfect final alignment, and (7) removing the overlay. The entire process happens behind the frozen snapshot so the user only sees the final correct position.
 
 **Best for**: Most apps. Pure SwiftUI, NavigationStack integration, keyboard handling automatic.
 
@@ -267,12 +269,13 @@ These measure array mutation and SwiftUI state update time, not rendering. Actua
 
 ### SwiftUI Backend
 - **The UIScrollView bridge uses view hierarchy traversal.** It walks SwiftUI's view tree to find the underlying UIScrollView, using only public UIKit APIs. This is App Store safe (same approach as SwiftUIIntrospect and other popular libraries), but could stop finding the scroll view if Apple changes SwiftUI's internal view structure in a future iOS version. If that happens, the bridge degrades gracefully — basic scrolling still works, but prepend correction and probe-align lose precision.
-- **`scrollTo(id:)` for variable heights.** The probe-align engine works perfectly for uniform heights. For highly variable heights (40-400pt), it typically lands within 10-60 items of the target due to LazyVStack materialization non-determinism. Use the UIKit backend if pixel-perfect scrollTo is critical.
+- **`scrollTo(id:)` with variable heights has a brief pause.** For uniform heights, `scrollTo(id:)` is near-instant. For highly variable heights (e.g. every 3rd row is taller) in large datasets (10K+), the probe-align engine may need several passes to locate the target — typically 200-600ms behind the snapshot overlay. The user sees a brief freeze before the viewport snaps to the correct position. The UIKit backend's `scrollToItem` is faster for this case, though it can also be imprecise with self-sizing cells at extreme distances.
 
 ### UIKit Backend
 - **Row content restrictions.** Views containing `UIViewControllerRepresentable` cannot be used in cells. `GeometryReader` in cells may cause sizing loops.
 - **NavigationStack large title.** Use `bounceToTop()` after toggling between `.large` and `.inline` display modes to force the nav bar to re-render.
 - **Keyboard handling.** Uses `keyboardDismissMode = .interactive` for swipe-to-dismiss. When pinned to bottom, the viewport automatically scrolls to keep the last message visible when the keyboard appears. Content inset adjustment relies on SwiftUI's container resizing.
+- **`scrollTo(id:)` with variable self-sizing cells.** `UICollectionView.scrollToItem` handles most cases well, but with highly variable self-sizing cells at extreme distances (e.g. jumping from item 1 to item 9000 in a 10K dataset), the estimated content size can cause slight inaccuracy. For most chat/feed UIs with moderate height variation, this is not noticeable.
 
 ## License
 

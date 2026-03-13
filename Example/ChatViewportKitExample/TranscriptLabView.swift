@@ -48,7 +48,7 @@ struct TranscriptLabView: View {
                 composerBar
                 controlBar
             }
-            .navigationTitle("Transcript Lab")
+            .navigationTitle("SwiftUI Backend")
             .navigationBarTitleDisplayMode(useLargeTitle ? .large : .inline)
             // .onAppear { runAutoScrollTest() } // Uncomment for automated tests
             // .onAppear { runProbeAlignTest() } // Uncomment to test probe-align
@@ -212,6 +212,7 @@ struct TranscriptLabView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 50)
                                 .keyboardType(.numberPad)
+                                .onSubmit { jumpToMessageIndex() }
                             Button("Go") { jumpToMessageIndex() }
                         }
                         Button("Expand") { expandLastMessage() }

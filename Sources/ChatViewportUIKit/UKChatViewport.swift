@@ -134,9 +134,32 @@ where Data: RandomAccessCollection, ID: Hashable, RowContent: View {
         var dataSource: UKDataSource<Data, ID, RowContent>?
         var previousItemCount: Int = 0
 
+        private var keyboardObserver: NSObjectProtocol?
+        private var previousBoundsHeight: CGFloat = 0
+
         init(controller: UKChatViewportController<ID>, configuration: ChatViewportConfiguration) {
             self.controller = controller
             self.configuration = configuration
+            super.init()
+
+            // When the keyboard appears/disappears, SwiftUI resizes our container.
+            // If pinned to bottom, scroll to keep the last message visible.
+            keyboardObserver = NotificationCenter.default.addObserver(
+                forName: UIResponder.keyboardDidChangeFrameNotification,
+                object: nil, queue: .main
+            ) { [weak self] _ in
+                guard let self = self,
+                      self.controller.isPinnedToBottom else { return }
+                DispatchQueue.main.async { [weak self] in
+                    self?.controller.scrollToBottom(animated: false)
+                }
+            }
+        }
+
+        deinit {
+            if let observer = keyboardObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
         }
 
         // Self-sizing is handled by UIHostingConfiguration + estimatedItemSize.

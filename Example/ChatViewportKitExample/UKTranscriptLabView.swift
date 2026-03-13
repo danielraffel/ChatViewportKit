@@ -45,6 +45,9 @@ struct UKTranscriptLabView: View {
                     HStack(spacing: 8) {
                         Button(useLargeTitle ? "Inline" : "Title") {
                             useLargeTitle.toggle()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                controller.bounceToTop()
+                            }
                         }
                         .foregroundColor(.accentColor)
                         Button("HUD") {
@@ -192,6 +195,7 @@ struct UKTranscriptLabView: View {
                                 .textFieldStyle(.roundedBorder)
                                 .frame(width: 50)
                                 .keyboardType(.numberPad)
+                                .onSubmit { jumpToMessageIndex() }
                             Button("Go") { jumpToMessageIndex() }
                         }
                         Button("Expand") { expandLastMessage() }

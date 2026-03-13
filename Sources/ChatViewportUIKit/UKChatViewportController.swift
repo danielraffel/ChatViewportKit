@@ -69,14 +69,20 @@ public final class UKChatViewportController<ID: Hashable>: ObservableObject, Cha
 
     public func scrollToBottom(animated: Bool = true) {
         guard let cv = collectionView else { return }
+        let sections = cv.numberOfSections
+        guard sections > 0 else { return }
+        let items = cv.numberOfItems(inSection: sections - 1)
+        guard items > 0 else { return }
+
+        programmaticScrollInFlight = true
         cv.layoutIfNeeded()
-        let maxOffset = cv.contentSize.height - cv.bounds.height + cv.adjustedContentInset.bottom
-        if maxOffset > 0 {
-            programmaticScrollInFlight = true
-            cv.setContentOffset(CGPoint(x: 0, y: maxOffset), animated: animated)
-            if !animated {
-                programmaticScrollInFlight = false
-            }
+        cv.scrollToItem(
+            at: IndexPath(item: items - 1, section: sections - 1),
+            at: .bottom,
+            animated: animated
+        )
+        if !animated {
+            programmaticScrollInFlight = false
         }
         transitionMode(.pinnedToBottom)
     }
@@ -111,6 +117,22 @@ public final class UKChatViewportController<ID: Hashable>: ObservableObject, Cha
         cv.scrollToItem(at: indexPath, at: position, animated: animated)
         if !animated {
             programmaticScrollInFlight = false
+        }
+        transitionMode(.freeBrowsing(anchor: nil))
+    }
+
+    /// Overscroll past the top then snap back — forces navigation bar to
+    /// re-render when switching between large and inline title display modes.
+    public func bounceToTop(animated: Bool = true) {
+        guard let cv = collectionView else { return }
+        programmaticScrollInFlight = true
+        let topOffset = -cv.adjustedContentInset.top
+        cv.setContentOffset(CGPoint(x: 0, y: topOffset - 100), animated: false)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self, weak cv] in
+            guard let cv = cv else { return }
+            let newTop = -cv.adjustedContentInset.top
+            cv.setContentOffset(CGPoint(x: 0, y: newTop), animated: animated)
+            self?.programmaticScrollInFlight = false
         }
         transitionMode(.freeBrowsing(anchor: nil))
     }

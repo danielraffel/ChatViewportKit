@@ -143,6 +143,7 @@ Imperative control and state observation.
 controller.scrollToBottom()
 controller.scrollToTop()
 controller.scrollTo(id: someMessageID, anchor: .center)
+controller.bounceToTop()  // Force nav bar re-render after title display mode change
 
 // State
 controller.isPinnedToBottom   // true when at the bottom
@@ -201,9 +202,9 @@ Keyboard avoidance and composer layout are handled by SwiftUI's standard layout 
 
 ## Example App
 
-The repo includes a **Transcript Lab** example app (`Example/`) with both backends. A picker root view lets you navigate into either backend's full lab view. Both share the same controls and data model.
+The repo includes an example app (`Example/`) with both backends. A picker root view lets you navigate into either backend's lab view — **SwiftUI Backend** (LazyVStack) or **UIKit Backend** (UICollectionView). Both share the same controls and data model.
 
-The SwiftUI backend (LazyVStack) and UIKit backend (UICollectionView) each exercise every capability:
+Each backend exercises every capability:
 
 **Append controls**: Add 1, 3, 10, 50, 5,000, or 10,000 messages. Burst-append 20 messages with 50ms spacing to simulate streaming.
 
@@ -260,8 +261,8 @@ All operations are well under the 16.67ms frame budget for 60fps. `LazyVStack` r
 
 ### UIKit Backend
 - **Row content restrictions.** Views containing `UIViewControllerRepresentable` cannot be used in cells. `GeometryReader` in cells may cause sizing loops.
-- **NavigationStack large title.** May need manual handling — a known UIViewRepresentable limitation.
-- **No built-in keyboard avoidance.** Uses `keyboardDismissMode = .interactive` for dismiss. Content inset adjustment relies on SwiftUI's container resizing.
+- **NavigationStack large title.** Use `bounceToTop()` after toggling between `.large` and `.inline` display modes to force the nav bar to re-render.
+- **Keyboard handling.** Uses `keyboardDismissMode = .interactive` for swipe-to-dismiss. When pinned to bottom, the viewport automatically scrolls to keep the last message visible when the keyboard appears. Content inset adjustment relies on SwiftUI's container resizing.
 
 ## License
 

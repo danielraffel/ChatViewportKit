@@ -16,13 +16,25 @@ Building a chat-style scrolling view in SwiftUI is deceptively hard. The basic `
 
 ChatViewportKit handles all of this with a single drop-in view.
 
-## How It Works
+## Two Backends
 
-The render engine is a standard SwiftUI `ScrollView` + `LazyVStack` - no `UICollectionView` wrapper, no inverted scroll views, no rotation hacks. Content is bottom-anchored using `.frame(minHeight: viewportHeight, alignment: .bottom)` on the `LazyVStack`, which pushes rows to the bottom when content is shorter than the viewport and grows naturally when it overflows.
+ChatViewportKit offers two independent scroll backends behind a shared protocol:
 
-A lightweight `UIScrollView` bridge (invisible to consumers) provides direct `contentOffset` access for pixel-precise position correction after prepends. This bridge only reads and writes the scroll offset — it never touches the content, delegate, or layout properties of the underlying scroll view.
+### ChatViewportSwiftUI (default)
 
-A state machine (`ViewportMode`) drives behavior deterministically:
+The render engine is a standard SwiftUI `ScrollView` + `LazyVStack` — no inverted scroll views, no rotation hacks. Content is bottom-anchored using `.frame(minHeight: viewportHeight, alignment: .bottom)`. A lightweight `UIScrollView` bridge provides pixel-precise offset correction for prepends and reliable `scrollTo(id:)` via a height-index + probe-align engine.
+
+**Best for**: Most apps. Pure SwiftUI, NavigationStack integration, keyboard handling automatic.
+
+### ChatViewportUIKit
+
+A `UICollectionView` backend wrapped in `UIViewRepresentable`. Uses `UICollectionViewFlowLayout` subclass for bottom-anchoring, `NSDiffableDataSourceSnapshot` for data management, and `UIHostingConfiguration` for SwiftUI row content.
+
+**Best for**: Apps needing guaranteed `scrollTo(id:)` precision with highly variable heights, or apps that need cell reuse control.
+
+### Shared Architecture
+
+Both backends conform to `ChatViewportControllerProtocol` and a state machine (`ViewportMode`) drives behavior deterministically:
 - `initialBottomAnchored` — first render, content at bottom
 - `pinnedToBottom` — user is at the bottom, auto-follow is active
 - `freeBrowsing` — user scrolled away, auto-follow is off
@@ -42,12 +54,19 @@ dependencies: [
 
 Or in Xcode: File > Add Package Dependencies, paste the repository URL.
 
+Three library products available:
+- `ChatViewportKit` — Compatibility alias, re-exports `ChatViewportSwiftUI`
+- `ChatViewportSwiftUI` — LazyVStack backend
+- `ChatViewportUIKit` — UICollectionView backend
+
 Requires iOS 16+.
 
 ## Quick Start
 
+### SwiftUI Backend
+
 ```swift
-import ChatViewportKit
+import ChatViewportKit  // or import ChatViewportSwiftUI
 
 struct MyChatView: View {
     @StateObject private var controller = ChatViewportController<UUID>()
@@ -55,6 +74,24 @@ struct MyChatView: View {
 
     var body: some View {
         ChatViewport(messages, controller: controller) { message in
+            Text(message.text)
+                .padding()
+        }
+    }
+}
+```
+
+### UIKit Backend
+
+```swift
+import ChatViewportUIKit
+
+struct MyChatView: View {
+    @StateObject private var controller = UKChatViewportController<UUID>()
+    @State private var messages: [Message] = []
+
+    var body: some View {
+        UKChatViewport(messages, controller: controller) { message in
             Text(message.text)
                 .padding()
         }
@@ -164,7 +201,9 @@ Keyboard avoidance and composer layout are handled by SwiftUI's standard layout 
 
 ## Example App
 
-The repo includes a **Transcript Lab** example app (`Example/`) that exercises every capability:
+The repo includes a **Transcript Lab** example app (`Example/`) with both backends. A picker root view lets you navigate into either backend's full lab view. Both share the same controls and data model.
+
+The SwiftUI backend (LazyVStack) and UIKit backend (UICollectionView) each exercise every capability:
 
 **Append controls**: Add 1, 3, 10, 50, 5,000, or 10,000 messages. Burst-append 20 messages with 50ms spacing to simulate streaming.
 
@@ -210,12 +249,19 @@ All operations are well under the 16.67ms frame budget for 60fps. `LazyVStack` r
 
 ## Known Limitations
 
+### Both Backends
 - **`prepareToPrepend()` is required before prepends.** The framework can't distinguish a prepend from other mutations without this signal.
-- **The UIScrollView bridge is private.** It traverses the view hierarchy to find the hosting UIScrollView. This works on iOS 16–18 but could break if Apple changes SwiftUI internals. The bridge is used for prepend offset correction, reliable scroll-to-bottom (at any distance), and auto-scroll on append.
-- **`scrollTo(id:)` has range limits.** SwiftUI's `ScrollViewReader` can fail for items far from the current render window in a `LazyVStack`. `scrollToBottom()` and `scrollToTop()` use the UIScrollView bridge and work reliably at any distance; `scrollTo(id:)` for arbitrary IDs is limited to ~15–20 positions from the current viewport.
 - **Data must have stable IDs.** Use UUIDs or other stable identifiers — not array indices.
 - **iOS 16+ only.**
-- **No built-in keyboard handling.** By design — compose the viewport with your own composer view in a `VStack`, and SwiftUI handles the rest. The viewport does automatically scroll to bottom on keyboard show/hide when pinned.
+
+### SwiftUI Backend
+- **The UIScrollView bridge is private.** It traverses the view hierarchy to find the hosting UIScrollView. This works on iOS 16–18 but could break if Apple changes SwiftUI internals.
+- **`scrollTo(id:)` for variable heights.** The probe-align engine works perfectly for uniform heights. For highly variable heights (40-400pt), it typically lands within 10-60 items of the target due to LazyVStack materialization non-determinism. Use the UIKit backend if pixel-perfect scrollTo is critical.
+
+### UIKit Backend
+- **Row content restrictions.** Views containing `UIViewControllerRepresentable` cannot be used in cells. `GeometryReader` in cells may cause sizing loops.
+- **NavigationStack large title.** May need manual handling — a known UIViewRepresentable limitation.
+- **No built-in keyboard avoidance.** Uses `keyboardDismissMode = .interactive` for dismiss. Content inset adjustment relies on SwiftUI's container resizing.
 
 ## License
 

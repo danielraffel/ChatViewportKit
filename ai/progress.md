@@ -48,46 +48,46 @@
 - [x] 35. Verify all commands
 
 ## Phase B3: Layout & Chrome
-- [ ] 36. Spacing support
-- [ ] 37. Keyboard handling
-- [ ] 38. Scroll indicators
-- [ ] 39. Append animation
-- [ ] 40. Verify visual quality
+- [x] 36. Spacing support
+- [x] 37. Keyboard handling
+- [x] 38. Scroll indicators
+- [x] 39. Append animation
+- [x] 40. Verify visual quality
 
 ## Phase B4: Edge Cases
-- [ ] 41. Height mutations
-- [ ] 42. Dynamic Type
-- [ ] 43. onBottomPinnedChanged
-- [ ] 44. estimatedRowHeight config
-- [ ] 45. Verify parity
+- [x] 41. Height mutations
+- [x] 42. Dynamic Type
+- [x] 43. onBottomPinnedChanged
+- [x] 44. estimatedRowHeight config
+- [x] 45. Verify parity
 
 ## Phase B5: Collection View Testing
-- [ ] 46. 10K rows performance
-- [ ] 47. scrollTo accuracy
-- [ ] 48. Variable heights
-- [ ] 49. Burst + prepend
-- [ ] 50. Verify 60fps
+- [x] 46. 10K rows performance
+- [x] 47. scrollTo accuracy
+- [x] 48. Variable heights
+- [x] 49. Burst + prepend
+- [x] 50. Verify 60fps
 
 ## Phase C: Example App
-- [ ] 51. Keep TranscriptLabView as-is
-- [ ] 52. Create UKTranscriptLabView
-- [ ] 53. Create BackendComparisonView
-- [ ] 54. Shared LabMessage model
-- [ ] 55. Jump-to-# in both
-- [ ] 56. Variable-height toggle in both
-- [ ] 57. Accuracy readout in both
-- [ ] 58. Identical button bars
-- [ ] 59. Root view with tabs
-- [ ] 60. Both backends testable
+- [x] 51. Keep TranscriptLabView as-is
+- [x] 52. Create UKTranscriptLabView
+- [x] 53. Create BackendComparisonView
+- [x] 54. Shared LabMessage model
+- [x] 55. Jump-to-# in both
+- [x] 56. Variable-height toggle in both
+- [x] 57. Accuracy readout in both
+- [x] 58. Identical button bars
+- [x] 59. Root view with tabs
+- [x] 60. Both backends testable
 
 ## Phase D: Documentation
-- [ ] 61. README — two-module architecture
-- [ ] 62. "When to use which" guide
-- [ ] 63. Comparison table
-- [ ] 64. Code examples per module
-- [ ] 65. ChatViewportKit docs update
-- [ ] 66. ChatViewportCV docs (new)
-- [ ] 67. known-limitations.md per backend
-- [ ] 68. CLAUDE.md update
-- [ ] 69. API consistency review
-- [ ] 70. Commit and push
+- [x] 61. README — two-module architecture
+- [x] 62. "When to use which" guide
+- [x] 63. Comparison table
+- [x] 64. Code examples per module
+- [x] 65. ChatViewportKit docs update
+- [x] 66. ChatViewportCV docs (new)
+- [x] 67. known-limitations.md per backend
+- [x] 68. CLAUDE.md update
+- [x] 69. API consistency review
+- [x] 70. Commit and push

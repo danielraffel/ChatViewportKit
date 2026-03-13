@@ -4,24 +4,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ChatViewportKit is a reusable SwiftUI bottom-anchored chat viewport component. Not just a "chat scroll view" — it's a viewport invariants engine that preserves competing truths (bottom pinning, stable history, anchor restoration) while content, size, and navigation chrome change.
+ChatViewportKit is a reusable SwiftUI bottom-anchored chat viewport component with two independent backends. Not just a "chat scroll view" — it's a viewport invariants engine that preserves competing truths (bottom pinning, stable history, anchor restoration) while content, size, and navigation chrome change.
 
 The component should serve: AI streaming conversations, activity feeds, event timelines, log consoles, comments/threads, and any bottom-aware transcript UI.
 
 ## Architecture
 
-ScrollView + LazyVStack is the render engine. A private UIScrollView bridge (Phase 3) provides pixel-precise anchor correction for prepend operations only — all other functionality uses pure SwiftUI APIs.
+Three Swift package modules — clean isolation:
+
+- **ChatViewportCore** — Shared protocol, config, mode enum (~100 lines). No UIKit dependency.
+- **ChatViewportSwiftUI** — LazyVStack backend with height index + probe-align engine. Imports Core.
+- **ChatViewportUIKit** — UICollectionView backend with diffable data source. Imports Core only. Does NOT import ChatViewportSwiftUI.
+
+```swift
+// SwiftUI backend (most apps):
+import ChatViewportSwiftUI  // or import ChatViewportKit (compatibility)
+
+// UIKit backend (guaranteed scrollTo precision):
+import ChatViewportUIKit
+```
+
+### When to Use Which
+
+- **ChatViewportSwiftUI**: Most apps. Pure SwiftUI, NavigationStack integration, keyboard handling automatic, lighter code. scrollTo(id:) uses height estimation + probe-align for far targets.
+- **ChatViewportUIKit**: Apps needing guaranteed scrollTo precision with highly variable heights, or apps needing cell reuse control. Trade: more manual keyboard/nav handling.
 
 ## Hard Requirements
 
-1. `LazyVStack` is the actual render stack
-2. Bottom-anchor initial underfilled content without startup jump (layout-based topFill, not scroll-on-appear)
-3. Expose `scrollToBottom`, `scrollToTop`, `scrollTo(id:)` via `ChatViewportController`
-4. No inverse scrolling or rotation hacks
-5. Animate tail insertions from bottom in both underfilled and overflowing states
-6. Work inside `NavigationStack` preserving native top blur
-7. Generic and reusable — not chat-message-specific
-8. Prepend and height changes do not visibly jump the viewport
+1. Bottom-anchor initial underfilled content without startup jump
+2. Expose `scrollToBottom`, `scrollToTop`, `scrollTo(id:)` via controller
+3. No inverse scrolling or rotation hacks
+4. Work inside `NavigationStack` preserving native top blur
+5. Generic and reusable — not chat-message-specific
+6. Prepend and height changes do not visibly jump the viewport
 
 ## Performance Targets (enforced, not aspirational)
 
@@ -29,44 +44,51 @@ ScrollView + LazyVStack is the render engine. A private UIScrollView bridge (Pha
 - Append burst of 50 messages: no frame drops while pinned
 - Prepend of 50 messages: anchor restoration within one frame
 - Keyboard show/hide + simultaneous append: no dropped frames
-- Measured with Instruments / frame time tracking — numbers, not vibes
 
-## Accepted API Shape
+## API Shape
 
 ```swift
+// Shared (ChatViewportCore)
+protocol ChatViewportControllerProtocol: ObservableObject
+protocol ChatViewportDiagnostics
+struct ChatViewportConfiguration
+enum ViewportMode<ID: Hashable>
+
+// SwiftUI backend
 struct ChatViewport<Data, ID, RowContent>: View
 final class ChatViewportController<ID: Hashable>: ObservableObject
-struct ChatViewportConfiguration
-enum ViewportMode<ID: Hashable>  // initialBottomAnchored, pinnedToBottom, freeBrowsing, programmaticScroll, correctingAfterDataChange
-struct AnchorSnapshot<ID: Hashable>
+
+// UIKit backend
+struct UKChatViewport<Data, ID, RowContent>: UIViewRepresentable
+final class UKChatViewportController<ID: Hashable>: ObservableObject
 ```
-
-## Swift Package Structure
-
-- `ChatViewportKit` — the reusable framework (ChatViewport, controller, configuration, state machine, anchor engine)
-- `ChatViewportKitExample` — Transcript Lab demo app (proves every capability)
-- Clean module boundary: no demo code in framework, no framework internals leaked
 
 ## Build & Run
 
 ```bash
-# Build for simulator
-xcodebuildmcp simulator build-sim --scheme ChatViewportKitExample --project-path ./Example/ChatViewportKitExample.xcodeproj --simulator-name "iPhone 16 Pro"
+# Build example app for simulator
+xcodebuildmcp simulator build --scheme ChatViewportKitExample --project-path ./Example/ChatViewportKitExample.xcodeproj --simulator-name "iPhone 17 Pro"
 
 # Build and run
-xcodebuildmcp simulator build-run-sim --scheme ChatViewportKitExample --project-path ./Example/ChatViewportKitExample.xcodeproj --simulator-name "iPhone 16 Pro"
+xcodebuildmcp simulator build-and-run --scheme ChatViewportKitExample --project-path ./Example/ChatViewportKitExample.xcodeproj --simulator-name "iPhone 17 Pro"
 
-# Build framework only
+# Build framework only (note: iOS-only, use xcodebuild not swift build)
 xcodebuildmcp swift-package build --package-path .
 ```
 
 ## Key Technical Concepts
 
-- **Underflow anchoring**: `topFill = max(0, viewportHeight - contentHeight)` — a real animatable filler view
-- **Underfill-to-overflow transition**: Animate filler shrink and row insertion in one transaction
-- **Anchor snapshots**: Capture visible item ID + offset before data changes, restore after layout settles
-- **Update pipeline**: Classify update → capture anchor → apply data → let layout settle → restore anchor → animate → recompute mode (the architectural spine — every mutation flows through it)
-- **Measurement regime**: Total content height only while underfilled; after overflow, rely on visible-row frames and bottom distance
+### SwiftUI Backend
+- **Underflow anchoring**: `.frame(minHeight:, alignment: .bottom)` — layout-based, not scroll-on-appear
+- **Height Index + Probe-Align**: For scrollTo(id:) to far/unmaterialized items. Proportional estimation, snapshot overlay, iterative refinement.
+- **UIScrollView bridge**: Pixel-precise offset correction for prepend and keyboard
+- **Anchor snapshots**: Capture visible item ID + offset before data changes, restore after layout
+
+### UIKit Backend
+- **UKBottomAnchoredLayout**: UICollectionViewFlowLayout subclass pushing underfilled content to bottom
+- **NSDiffableDataSourceSnapshot**: Bridge from RandomAccessCollection to collection view
+- **UIHostingConfiguration**: SwiftUI row content in self-sizing cells
+- **Native scrollToItem**: No probe-align needed — layout engine handles estimates
 
 ## Target
 

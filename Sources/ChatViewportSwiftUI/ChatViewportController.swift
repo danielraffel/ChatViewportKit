@@ -365,6 +365,8 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
                     self.finishProbeSession(animated: false)
                     self.transitionMode(.freeBrowsing(anchor: nil))
                     self.issueCommand(.scrollTo(id: targetID, anchor: anchor, animated: false))
+                    // Silent verification — we're now close, retry will be precise
+                    self.scheduleVerification(targetID: targetID, anchor: anchor, scrollView: scrollView)
                 }
             }
         }
@@ -405,6 +407,11 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
         finishProbeSession(animated: shouldAnimate && !reduceMotion)
         transitionMode(.freeBrowsing(anchor: nil))
         UIAccessibility.post(notification: .layoutChanged, argument: nil)
+
+        // Silent verification: after layout settles, check if we actually
+        // landed on the target. If not, the target is now nearby and measured,
+        // so a second scrollTo will be precise.
+        scheduleVerification(targetID: targetID, anchor: anchor, scrollView: scrollView)
     }
 
     /// Called when probe doesn't find the target — correct offset and schedule next pass.
@@ -454,6 +461,58 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
                 scrollView: scrollView, sessionGen: sessionGen,
                 passNumber: passNumber + 1, maxPasses: maxPasses
             )
+        }
+    }
+
+    /// After a probe session completes, verify we actually landed near the target.
+    /// If not, the target should now be measured (we got close), so a second
+    /// scrollTo will use the fast path with precise height data.
+    private func scheduleVerification(targetID: ID, anchor: UnitPoint, scrollView: UIScrollView) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self, weak scrollView] in
+            guard let self = self, let scrollView = scrollView else { return }
+            // Don't interfere if user has started scrolling or another command is in flight
+            guard !self.idScrollInFlight else { return }
+
+            // Check if target is visible by looking at visible content
+            scrollView.layoutIfNeeded()
+            let targetMeasured = self.heightIndex.heights[targetID] != nil
+
+            if targetMeasured {
+                // Target was materialized during probing — we have precise height data.
+                // Recompute precise offset and correct silently if needed.
+                let preciseOffset = self.heightIndex.estimatedOffset(
+                    to: targetID, in: self.orderedIDs, spacing: self.configSpacing
+                )
+                let topInset = scrollView.adjustedContentInset.top
+                var targetY = preciseOffset - topInset
+
+                if anchor == .center {
+                    let viewportHeight = scrollView.bounds.height
+                    let h = self.heightIndex.heights[targetID] ?? 44
+                    targetY = preciseOffset - topInset - (viewportHeight - h) / 2
+                } else if anchor == .bottom {
+                    let viewportHeight = scrollView.bounds.height
+                    let h = self.heightIndex.heights[targetID] ?? 44
+                    targetY = preciseOffset - topInset - viewportHeight + h
+                }
+
+                let maxOffset = scrollView.contentSize.height - scrollView.bounds.height + scrollView.contentInset.bottom
+                targetY = min(max(targetY, -topInset), maxOffset)
+
+                let drift = abs(targetY - scrollView.contentOffset.y)
+                if drift > 100 {
+                    // Significant drift — correct silently
+                    let reduceMotion = UIAccessibility.isReduceMotionEnabled
+                    scrollView.setContentOffset(
+                        CGPoint(x: 0, y: targetY),
+                        animated: !reduceMotion
+                    )
+                }
+            } else {
+                // Target still not measured — try scrollTo again.
+                // Being closer now means the probe will converge faster.
+                self.scrollTo(id: targetID, anchor: anchor, animated: true)
+            }
         }
     }
 

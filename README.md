@@ -260,7 +260,7 @@ These measure array mutation and SwiftUI state update time, not rendering. Actua
 - **iOS 16+ only.**
 
 ### SwiftUI Backend
-- **The UIScrollView bridge is private.** It traverses the view hierarchy to find the hosting UIScrollView. This works on iOS 16–26 but could break if Apple changes SwiftUI internals.
+- **The UIScrollView bridge uses view hierarchy traversal.** It walks SwiftUI's view tree to find the underlying UIScrollView, using only public UIKit APIs. This is App Store safe (same approach as SwiftUIIntrospect and other popular libraries), but could stop finding the scroll view if Apple changes SwiftUI's internal view structure in a future iOS version. If that happens, the bridge degrades gracefully — basic scrolling still works, but prepend correction and probe-align lose precision.
 - **`scrollTo(id:)` for variable heights.** The probe-align engine works perfectly for uniform heights. For highly variable heights (40-400pt), it typically lands within 10-60 items of the target due to LazyVStack materialization non-determinism. Use the UIKit backend if pixel-perfect scrollTo is critical.
 
 ### UIKit Backend

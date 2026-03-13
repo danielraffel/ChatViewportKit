@@ -258,9 +258,12 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
     }
 
     /// Start a probe-align session to scroll to a far (unmaterialized) target.
-    private func startProbeAlign(targetID: ID, anchor: UnitPoint, animated: Bool, scrollView: UIScrollView) {
-        // Cancel any existing session
-        cancelProbeSession()
+    /// retryCount tracks how many times we've restarted from a closer position.
+    private func startProbeAlign(targetID: ID, anchor: UnitPoint, animated: Bool, scrollView: UIScrollView, retryCount: Int = 0) {
+        // Cancel any existing session (but preserve overlay on retry)
+        if retryCount == 0 {
+            cancelProbeSession()
+        }
 
         idScrollInFlight = true
         let sessionGen = probeSessionGeneration
@@ -268,14 +271,14 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
 
         // Step 1: Capture snapshot overlay on scroll view's SUPERVIEW (design rule 2).
         // This masks the wrong-content flash during probing.
-        if let superview = scrollView.superview {
-            let snapshot = scrollView.snapshotView(afterScreenUpdates: false) ?? UIView()
-            snapshot.frame = scrollView.frame
-            superview.addSubview(snapshot)
-            probeOverlay = snapshot
-            // print("[PROBE] Overlay attached to superview")
-        } else {
-            // print("[PROBE] WARNING: no superview for overlay")
+        // On retries, keep the existing overlay.
+        if retryCount == 0 {
+            if let superview = scrollView.superview {
+                let snapshot = scrollView.snapshotView(afterScreenUpdates: false) ?? UIView()
+                snapshot.frame = scrollView.frame
+                superview.addSubview(snapshot)
+                probeOverlay = snapshot
+            }
         }
 
         // Step 2: Compute estimated offset.
@@ -315,7 +318,8 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
             scrollView: scrollView,
             sessionGen: sessionGen,
             passNumber: 1,
-            maxPasses: 6
+            maxPasses: 6,
+            retryCount: retryCount
         )
     }
 
@@ -326,7 +330,8 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
         scrollView: UIScrollView,
         sessionGen: UInt64,
         passNumber: Int,
-        maxPasses: Int
+        maxPasses: Int,
+        retryCount: Int = 0
     ) {
         // print("[PROBE] probePass \(passNumber)/\(maxPasses)")
         // First async hop: let SwiftUI materialize views at new offset
@@ -351,22 +356,30 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
                     // print("[PROBE] TARGET FOUND! measuredHeight=\(measuredHeight)")
                     self.finishProbeWithTarget(
                         targetID: targetID, measuredHeight: measuredHeight,
-                        anchor: anchor, animated: animated, scrollView: scrollView
+                        anchor: anchor, animated: animated, scrollView: scrollView,
+                        retryCount: retryCount
                     )
                 } else if passNumber < maxPasses {
                     // Correct offset using topVisibleItemID if available
                     self.correctAndRetry(
                         targetID: targetID, anchor: anchor, animated: animated,
                         scrollView: scrollView, sessionGen: sessionGen,
-                        passNumber: passNumber, maxPasses: maxPasses
+                        passNumber: passNumber, maxPasses: maxPasses,
+                        retryCount: retryCount
+                    )
+                } else if retryCount < 2 {
+                    // Max passes exhausted but we're now closer. Retry probe from
+                    // this position — overlay stays up so user sees nothing.
+                    // With more measured heights, estimation converges.
+                    self.startProbeAlign(
+                        targetID: targetID, anchor: anchor, animated: animated,
+                        scrollView: scrollView, retryCount: retryCount + 1
                     )
                 } else {
-                    // print("[PROBE] MAX PASSES EXHAUSTED, falling back to proxy")
+                    // Final fallback after retries — use proxy scroll from close position
                     self.finishProbeSession(animated: false)
                     self.transitionMode(.freeBrowsing(anchor: nil))
                     self.issueCommand(.scrollTo(id: targetID, anchor: anchor, animated: false))
-                    // Silent verification — we're now close, retry will be precise
-                    self.scheduleVerification(targetID: targetID, anchor: anchor, scrollView: scrollView)
                 }
             }
         }
@@ -375,7 +388,8 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
     /// Called when probe finds the target — compute precise offset and snap to it.
     private func finishProbeWithTarget(
         targetID: ID, measuredHeight: CGFloat,
-        anchor: UnitPoint, animated: Bool, scrollView: UIScrollView
+        anchor: UnitPoint, animated: Bool, scrollView: UIScrollView,
+        retryCount: Int = 0
     ) {
         let preciseOffset = heightIndex.estimatedOffset(
             to: targetID, in: orderedIDs, spacing: configSpacing
@@ -418,7 +432,8 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
     private func correctAndRetry(
         targetID: ID, anchor: UnitPoint, animated: Bool,
         scrollView: UIScrollView, sessionGen: UInt64,
-        passNumber: Int, maxPasses: Int
+        passNumber: Int, maxPasses: Int,
+        retryCount: Int = 0
     ) {
         let topInset = scrollView.adjustedContentInset.top
         let currentOffset = scrollView.contentOffset.y
@@ -426,7 +441,7 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
 
         // Use height-index-based estimation when we have enough data (accumulated
         // across probe passes). Falls back to proportional estimation otherwise.
-        if heightIndex.heights.count > 30, let targIdx = targetIdx {
+        if heightIndex.heights.count > 30, let _ = targetIdx {
             let targetOffset = heightIndex.estimatedOffset(
                 to: targetID, in: orderedIDs, spacing: configSpacing
             )
@@ -459,7 +474,8 @@ public final class ChatViewportController<ID: Hashable>: ObservableObject, ChatV
             self.probePass(
                 targetID: targetID, anchor: anchor, animated: animated,
                 scrollView: scrollView, sessionGen: sessionGen,
-                passNumber: passNumber + 1, maxPasses: maxPasses
+                passNumber: passNumber + 1, maxPasses: maxPasses,
+                retryCount: retryCount
             )
         }
     }
